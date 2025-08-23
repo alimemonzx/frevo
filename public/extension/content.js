@@ -1,6 +1,7 @@
 (function () {
   console.log("🎯 Content script loaded on:", window.location.href);
   let filterEnabled = false;
+  let minStarRating = 0;
   let intervalId = null;
   let frevoButtonInjected = false;
   let projectDescription = "";
@@ -17,6 +18,17 @@
       pathSegments: path.split("/"),
     });
     return isDetail;
+  };
+
+  // Check if we're on the search/projects page
+  const isSearchPage = () => {
+    const path = window.location.pathname;
+    const isSearch = path.includes("/search/projects");
+    console.log("🔍 Search Page Check:", {
+      path,
+      isSearch,
+    });
+    return isSearch;
   };
 
   // Extract project description from the page
@@ -390,15 +402,61 @@
     console.log("🎨 Shadow DOM will handle all styling");
   };
 
-  const removeZeroRated = () => {
+  // Filter projects based on minimum star rating
+  const filterProjectsByRating = () => {
     if (!filterEnabled) return;
-    const zeroRated = document.querySelectorAll('[data-rating="0"]');
-    zeroRated.forEach((el) => {
-      let itemContainer = el.closest(
-        "a, .ProjectCard, .Container, .ng-star-inserted"
-      );
+
+    // Only apply filtering on search/projects page
+    if (!isSearchPage()) {
+      console.log("🔍 Not on search page, skipping star rating filter");
+      return;
+    }
+
+    console.log(`⭐ Filtering projects with minimum rating: ${minStarRating}`);
+
+    // Find all elements with data-rating attributes (more specific approach)
+    const ratedElements = document.querySelectorAll("[data-rating]");
+
+    ratedElements.forEach((el) => {
+      // Get the rating value from data-rating attribute
+      const ratingAttr = el.getAttribute("data-rating");
+      const rating = parseFloat(ratingAttr) || 0;
+
+      // Find the project container (be more specific to avoid hiding main containers)
+      let itemContainer = el.closest("a") || el.closest(".ProjectCard");
+
+      // If we don't find a specific container, try to find the project item
+      if (!itemContainer) {
+        // Look for common project container patterns, but avoid main page containers
+        const possibleContainers = el.closest(
+          '[class*="project"], [class*="Project"], [class*="item"], [class*="Item"]'
+        );
+        if (
+          possibleContainers &&
+          !possibleContainers.classList.contains("Container")
+        ) {
+          itemContainer = possibleContainers;
+        }
+      }
+
       if (itemContainer) {
-        itemContainer.remove();
+        // If rating is below minimum, hide the project
+        if (rating < minStarRating) {
+          itemContainer.style.display = "none";
+          console.log(
+            `🚫 Hidden project with rating ${rating} (below ${minStarRating})`
+          );
+        } else {
+          // Show projects that meet the rating requirement
+          itemContainer.style.display = "";
+          console.log(
+            `✅ Showing project with rating ${rating} (above ${minStarRating})`
+          );
+        }
+      } else {
+        console.log(
+          `⚠️ Could not find container for element with rating ${rating}`
+        );
       }
     });
   };
@@ -454,12 +512,15 @@
   };
 
   // Load initial state
-  chrome.storage.sync.get(["enabled"], (data) => {
+  chrome.storage.sync.get(["enabled", "minStarRating"], (data) => {
     console.log("Content script loaded, checking filter state...");
     filterEnabled = data.enabled || false;
+    minStarRating = data.minStarRating || 0;
     if (filterEnabled) {
-      console.log("Filter enabled, starting interval...");
-      intervalId = setInterval(removeZeroRated, 2000);
+      console.log(
+        `Filter enabled with minimum rating: ${minStarRating}, starting interval...`
+      );
+      intervalId = setInterval(filterProjectsByRating, 2000);
     }
   });
 
@@ -511,8 +572,9 @@
     console.log("📨 Received message:", message);
     if (message.action === "enable") {
       filterEnabled = true;
-      if (!intervalId) intervalId = setInterval(removeZeroRated, 2000);
-      console.log("✅ Filter enabled");
+      minStarRating = message.minStarRating || 0;
+      if (!intervalId) intervalId = setInterval(filterProjectsByRating, 2000);
+      console.log(`✅ Filter enabled with minimum rating: ${minStarRating}`);
     } else if (message.action === "disable") {
       filterEnabled = false;
       if (intervalId) {
@@ -520,6 +582,13 @@
         intervalId = null;
       }
       console.log("❌ Filter disabled");
+    } else if (message.action === "update-rating") {
+      minStarRating = message.minStarRating || 0;
+      console.log(`⭐ Updated minimum star rating to: ${minStarRating}`);
+      // Immediately apply the new filter
+      if (filterEnabled) {
+        filterProjectsByRating();
+      }
     } else if (message.action === "inject-frevo") {
       // Force inject Frevo button (for testing)
       if (isDetailPage()) {

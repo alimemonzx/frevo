@@ -1,14 +1,17 @@
 # Frevo - Freelancer.com Enhancement Extension
 
-A Chrome extension that enhances your Freelancer.com experience by filtering out zero-rated projects and providing AI-powered writing assistance.
+A Chrome extension that enhances your Freelancer.com experience by filtering projects based on star ratings and providing AI-powered writing assistance.
 
 ## Features
 
-### 🎯 Zero Rating Filter
+### ⭐ Star Rating Filter
 
-- Automatically hides projects with 0 ratings
-- Helps you focus on quality opportunities
-- Toggle on/off from the extension popup
+- **Smart Filtering**: Filter projects based on minimum star rating (0.0 to 5.0)
+- **Precise Control**: Adjust minimum rating with 0.1 precision using the slider
+- **Real-time Updates**: Changes apply immediately to the current page
+- **Toggle On/Off**: Enable or disable filtering from the extension popup
+- **Search Page Only**: Filtering only works on `/search/projects` pages
+- **Example**: Set to 3.5 to only see projects with 3.5+ star ratings
 
 ### ✨ AI Writing Assistant (Frevo)
 
@@ -36,11 +39,22 @@ A Chrome extension that enhances your Freelancer.com experience by filtering out
 
 ## Usage
 
-### Zero Rating Filter
+### Star Rating Filter
 
 1. Click the Frevo extension icon in your browser toolbar
 2. Toggle the filter on/off using the switch
-3. The filter will automatically hide zero-rated projects on Freelancer.com
+3. **Adjust Minimum Rating**: Use the slider to set your desired minimum star rating (0.0 to 5.0)
+4. **Navigate to Search Page**: Go to any Freelancer.com search page (URL contains `/search/projects`)
+5. The filter will automatically hide projects below your selected rating threshold
+6. **Real-time Filtering**: Changes to the slider apply immediately to the current page
+
+**Examples:**
+
+- Set to 0.0: Show all projects (no filtering)
+- Set to 3.0: Only show projects with 3.0+ star ratings
+- Set to 4.5: Only show high-quality projects with 4.5+ star ratings
+
+**Note**: The star rating filter only works on search/projects pages. It will not affect project detail pages or other sections of the site.
 
 ### AI Writing Assistant
 

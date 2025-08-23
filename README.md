@@ -8,7 +8,8 @@ A Chrome extension that enhances your Freelancer.com experience by filtering pro
 
 - **Smart Filtering**: Filter projects based on minimum star rating (0.0 to 5.0)
 - **Precise Control**: Adjust minimum rating with 0.1 precision using the slider
-- **Real-time Updates**: Changes apply immediately to the current page
+- **Smart Memory**: Remembers your last selected rating preference
+- **Event-driven Filtering**: Triggers instantly on slider changes and page navigation
 - **Toggle On/Off**: Enable or disable filtering from the extension popup
 - **Search Page Only**: Filtering only works on `/search/projects` pages
 - **Example**: Set to 3.5 to only see projects with 3.5+ star ratings
@@ -42,11 +43,11 @@ A Chrome extension that enhances your Freelancer.com experience by filtering pro
 ### Star Rating Filter
 
 1. Click the Frevo extension icon in your browser toolbar
-2. Toggle the filter on/off using the switch
-3. **Adjust Minimum Rating**: Use the slider to set your desired minimum star rating (0.0 to 5.0)
+2. In the **Filter Controls** section (left side), toggle the filter on/off
+3. **Adjust Minimum Rating**: When enabled, use the slider to set your desired minimum star rating (0.0 to 5.0)
 4. **Navigate to Search Page**: Go to any Freelancer.com search page (URL contains `/search/projects`)
 5. The filter will automatically hide projects below your selected rating threshold
-6. **Real-time Filtering**: Changes to the slider apply immediately to the current page
+6. **Instant Filtering**: Changes to the slider trigger filtering immediately
 
 **Examples:**
 
@@ -58,12 +59,11 @@ A Chrome extension that enhances your Freelancer.com experience by filtering pro
 
 ### AI Writing Assistant
 
-1. Navigate to any project detail page on Freelancer.com
-2. Look for the **"Write with Frevo"** button next to the existing AI button
-3. Click the button to open the AI settings modal
-4. Enter your OpenAI API key (stored securely in Chrome sync storage)
-5. Test the API connection with the "Test API Call" button
-6. Once configured, you can use Frevo for AI-powered writing assistance
+1. In the **AI Assistant** section (right side), enter your OpenAI API key
+2. Navigate to any project detail page on Freelancer.com
+3. Look for the **"Write with Frevo"** button next to the existing AI button
+4. Click the button to generate AI-powered proposals
+5. The generated proposal will be automatically inserted into the bid form
 
 ## Development
 

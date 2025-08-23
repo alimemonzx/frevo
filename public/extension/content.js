@@ -2,11 +2,12 @@
   console.log("🎯 Content script loaded on:", window.location.href);
   let filterEnabled = false;
   let minStarRating = 0;
-  let intervalId = null;
+  let jobsPerPage = 20;
   let frevoButtonInjected = false;
   let projectDescription = "";
   let currentUrl = window.location.href;
   let observer = null;
+  let lastInterceptedUrl = null;
 
   // Check if we're on a project detail page
   const isDetailPage = () => {
@@ -188,11 +189,6 @@
     // Create shadow root
     const shadow = hostElement.attachShadow({ mode: "closed" });
 
-    // Add Tailwind CSS link to shadow DOM
-    const tailwindLink = document.createElement("link");
-    tailwindLink.rel = "stylesheet";
-    tailwindLink.href = chrome.runtime.getURL("assets/style.css");
-
     // Add custom styles for button reset and missing Tailwind classes
     const customStyle = document.createElement("style");
     customStyle.textContent = `
@@ -352,7 +348,6 @@
     });
 
     // Assemble shadow DOM
-    shadow.appendChild(tailwindLink);
     shadow.appendChild(customStyle);
     shadow.appendChild(button);
 
@@ -461,6 +456,38 @@
     });
   };
 
+  // Restore all hidden projects when filter is disabled
+  const restoreAllProjects = () => {
+    console.log("🔄 Restoring all hidden projects...");
+
+    // Find all elements with data-rating attributes
+    const ratedElements = document.querySelectorAll("[data-rating]");
+
+    ratedElements.forEach((el) => {
+      // Find the project container
+      let itemContainer = el.closest("a") || el.closest(".ProjectCard");
+
+      if (!itemContainer) {
+        const possibleContainers = el.closest(
+          '[class*="project"], [class*="Project"], [class*="item"], [class*="Item"]'
+        );
+        if (
+          possibleContainers &&
+          !possibleContainers.classList.contains("Container")
+        ) {
+          itemContainer = possibleContainers;
+        }
+      }
+
+      if (itemContainer) {
+        // Restore visibility for all projects
+        itemContainer.style.display = "";
+      }
+    });
+
+    console.log("✅ All projects restored");
+  };
+
   // Check for URL changes
   const checkUrlChange = () => {
     const newUrl = window.location.href;
@@ -477,6 +504,14 @@
         setTimeout(() => {
           initializeFrevo();
         }, 500); // Small delay to ensure DOM is ready
+      }
+
+      // Apply filter if we're on a search page and filter is enabled
+      if (isSearchPage() && filterEnabled) {
+        console.log("🔄 URL changed to search page, applying filter...");
+        setTimeout(() => {
+          filterProjectsByRating();
+        }, 1000); // Small delay to ensure projects are loaded
       }
     }
   };
@@ -511,18 +546,47 @@
     console.log("🔍 URL change detection set up");
   };
 
+  // Trigger page refresh to apply new jobs per page setting
+  const triggerPageRefresh = () => {
+    console.log(
+      "🔄 Triggering page refresh to apply new jobs per page setting..."
+    );
+
+    // Simple and reliable: just reload the page
+    // Our interception will handle the API requests with proper headers
+    window.location.reload();
+  };
+
+  // Note: Request interception is now handled by background script using chrome.webRequest API
+  console.log(
+    "📝 Content script: Request interception handled by background script"
+  );
+
   // Load initial state
-  chrome.storage.sync.get(["enabled", "minStarRating"], (data) => {
-    console.log("Content script loaded, checking filter state...");
-    filterEnabled = data.enabled || false;
-    minStarRating = data.minStarRating || 0;
-    if (filterEnabled) {
+  chrome.storage.sync.get(
+    ["enabled", "minStarRating", "jobsPerPage"],
+    (data) => {
+      console.log("Content script loaded, checking filter state...");
+      filterEnabled = data.enabled || false;
+      // Use last selected rating or default to 0
+      minStarRating = data.minStarRating !== undefined ? data.minStarRating : 0;
+      // Use jobs per page setting or default to 20
+      jobsPerPage = data.jobsPerPage !== undefined ? data.jobsPerPage : 20;
+
+      console.log("📊 Initial jobsPerPage setting:", jobsPerPage);
       console.log(
-        `Filter enabled with minimum rating: ${minStarRating}, starting interval...`
+        "📝 Note: Request interception is now handled by background script"
       );
-      intervalId = setInterval(filterProjectsByRating, 2000);
+
+      if (filterEnabled && isSearchPage()) {
+        console.log(
+          `Filter enabled with minimum rating: ${minStarRating}, applying initial filter...`
+        );
+        // Apply filter immediately on load if on search page
+        filterProjectsByRating();
+      }
     }
-  });
+  );
 
   // Initialize Frevo features
   const initializeFrevo = () => {
@@ -567,28 +631,55 @@
   // Set up URL change detection
   setupUrlChangeDetection();
 
+  // Add debugging to check if we're on Freelancer
+  console.log("🌐 Current URL:", window.location.href);
+  console.log(
+    "🔍 Is Freelancer domain:",
+    window.location.hostname.includes("freelancer.com")
+  );
+
   // Listen for toggle from popup
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("📨 Received message:", message);
     if (message.action === "enable") {
       filterEnabled = true;
-      minStarRating = message.minStarRating || 0;
-      if (!intervalId) intervalId = setInterval(filterProjectsByRating, 2000);
+      minStarRating =
+        message.minStarRating !== undefined ? message.minStarRating : 0;
       console.log(`✅ Filter enabled with minimum rating: ${minStarRating}`);
-    } else if (message.action === "disable") {
-      filterEnabled = false;
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-      console.log("❌ Filter disabled");
-    } else if (message.action === "update-rating") {
-      minStarRating = message.minStarRating || 0;
-      console.log(`⭐ Updated minimum star rating to: ${minStarRating}`);
-      // Immediately apply the new filter
-      if (filterEnabled) {
+      // Apply filter immediately if on search page
+      if (isSearchPage()) {
         filterProjectsByRating();
       }
+    } else if (message.action === "disable") {
+      filterEnabled = false;
+      console.log("❌ Filter disabled");
+      // Restore all hidden projects when disabled
+      if (isSearchPage()) {
+        restoreAllProjects();
+      }
+    } else if (message.action === "update-rating") {
+      minStarRating =
+        message.minStarRating !== undefined ? message.minStarRating : 0;
+      console.log(`⭐ Updated minimum star rating to: ${minStarRating}`);
+      // Immediately apply the new filter if enabled and on search page
+      if (filterEnabled && isSearchPage()) {
+        filterProjectsByRating();
+      }
+    } else if (message.action === "update-jobs-per-page") {
+      jobsPerPage =
+        message.jobsPerPage !== undefined ? message.jobsPerPage : 20;
+      console.log(`📄 Updated jobs per page to: ${jobsPerPage}`);
+      console.log(
+        "📝 Note: Background script will automatically use new setting for future requests"
+      );
+
+      // Update jobs per page setting without page refresh
+      jobsPerPage =
+        message.jobsPerPage !== undefined ? message.jobsPerPage : 20;
+      console.log(`📄 Updated jobs per page to: ${jobsPerPage}`);
+      console.log(
+        "📝 Note: Background script will automatically use new setting for future requests"
+      );
     } else if (message.action === "inject-frevo") {
       // Force inject Frevo button (for testing)
       if (isDetailPage()) {

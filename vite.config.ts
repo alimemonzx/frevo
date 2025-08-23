@@ -32,6 +32,17 @@ export default defineConfig({
           console.log("✅ content.js copied to dist/");
         }
 
+        // Copy background.js to root of dist
+        const backgroundSrc = resolve(
+          __dirname,
+          "public/extension/background.js"
+        );
+        const backgroundDest = resolve(outDir, "background.js");
+        if (existsSync(backgroundSrc)) {
+          copyFileSync(backgroundSrc, backgroundDest);
+          console.log("✅ background.js copied to dist/");
+        }
+
         console.log("✅ Extension files copied to dist/");
       },
     },

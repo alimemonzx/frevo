@@ -18,19 +18,23 @@ function App() {
   // Load initial state from Chrome storage
   useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.storage) {
+      // Load sync settings (filter, API key, etc.)
       chrome.storage.sync.get(
-        ["enabled", "openAIKey", "minStarRating", "jobsPerPage"],
-        (data) => {
-          setIsEnabled(data.enabled || false);
-          setOpenAIKey(data.openAIKey || "");
-          // Use last selected rating or default to 0
+        ["enabled", "openAIKey", "minStarRating"],
+        (syncData) => {
+          setIsEnabled(syncData.enabled || false);
+          setOpenAIKey(syncData.openAIKey || "");
           setMinStarRating(
-            data.minStarRating !== undefined ? data.minStarRating : 0
+            syncData.minStarRating !== undefined ? syncData.minStarRating : 0
           );
-          setJobsPerPage(
-            data.jobsPerPage !== undefined ? data.jobsPerPage : 20
-          );
-          setIsLoading(false);
+
+          // Load local settings (pagination) - default to 20 now
+          chrome.storage.local.get(["jobsPerPage"], (localData) => {
+            setJobsPerPage(
+              localData.jobsPerPage !== undefined ? localData.jobsPerPage : 20
+            );
+            setIsLoading(false);
+          });
         }
       );
     } else {
@@ -106,28 +110,89 @@ function App() {
     }
   };
 
-  const handleJobsPerPageChange = (value: number) => {
-    setJobsPerPage(value);
+  // Fixed - Proper storage verification and refresh timing
+  const handleJobsPerPageChange = async (value: number) => {
+    console.log(`🎯 User wants to set pagination to: ${value}`);
+
     if (typeof chrome !== "undefined" && chrome.storage) {
-      chrome.storage.sync.set({ jobsPerPage: value }, () => {
-        // Send updated jobs per page to content script
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0]?.id) {
-            try {
-              chrome.tabs
-                .sendMessage(tabs[0].id, {
-                  action: "update-jobs-per-page",
-                  jobsPerPage: value,
-                })
-                .catch((error) => {
-                  console.log("Content script not ready yet:", error.message);
-                });
-            } catch (error) {
-              console.log("Error sending message to content script:", error);
+      try {
+        // Step 1: Update local state immediately
+        setJobsPerPage(value);
+
+        // Step 2: Use Promise to ensure storage write completes
+        await new Promise<void>((resolve, reject) => {
+          chrome.storage.local.set({ jobsPerPage: value }, () => {
+            if (chrome.runtime.lastError) {
+              console.error("❌ Storage error:", chrome.runtime.lastError);
+              reject(chrome.runtime.lastError);
+            } else {
+              console.log(`✅ Storage write completed: ${value}`);
+              resolve();
             }
-          }
+          });
         });
-      });
+
+        // Step 3: Verify the value was actually stored
+        const verification = await new Promise<number>((resolve) => {
+          chrome.storage.local.get(["jobsPerPage"], (result) => {
+            const storedValue = result.jobsPerPage;
+            console.log(`🔍 Verification read: ${storedValue}`);
+            resolve(storedValue);
+          });
+        });
+
+        if (verification === value) {
+          console.log(`✅ Verification successful: ${verification}`);
+
+          // Step 4: Send message to content script to update injected script
+          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]?.id) {
+              chrome.tabs.sendMessage(
+                tabs[0].id,
+                {
+                  action: "update-pagination",
+                  jobsPerPage: value,
+                },
+                (response) => {
+                  console.log(
+                    `📤 Message sent to content script: ${value}`,
+                    response
+                  );
+
+                  // Step 5: Wait a moment for the injected script to receive the update
+                  setTimeout(() => {
+                    console.log(
+                      `🔄 Refreshing page with new pagination: ${value}`
+                    );
+                    chrome.tabs.reload(tabs[0].id!);
+                    window.close();
+                  }, 300); // Increased delay to ensure message is processed
+                }
+              );
+            }
+          });
+        } else {
+          console.error(
+            `❌ Verification failed. Expected: ${value}, Got: ${verification}`
+          );
+          throw new Error("Storage verification failed");
+        }
+      } catch (error) {
+        console.error("❌ Error updating pagination:", error);
+        alert("Failed to update pagination. Please try again.");
+      }
+    }
+  };
+
+  const resetPagination = async () => {
+    const defaultValue = 20;
+    console.log(`🔄 Resetting pagination to default: ${defaultValue}`);
+
+    try {
+      await handleJobsPerPageChange(defaultValue);
+    } catch (error) {
+      console.error("❌ Error resetting pagination:", error);
+      alert("Failed to reset pagination. Please try again.");
     }
   };
 
@@ -156,25 +221,52 @@ function App() {
 
             {/* Jobs per page input */}
             <div className="mb-4">
-              <label className="text-xs font-medium text-gray-700 block mb-2">
-                Jobs per page
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={jobsPerPage}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value);
-                  if (value >= 1 && value <= 100) {
-                    handleJobsPerPageChange(value);
-                  }
-                }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="20"
-              />
-              <p className="text-xs text-gray-600 mt-1">
-                Maximum 100 jobs per page
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-gray-700">
+                  Jobs per page
+                </label>
+                <button
+                  onClick={resetPagination}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Reset to 20
+                </button>
+              </div>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={jobsPerPage}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (!isNaN(value) && value >= 1 && value <= 100) {
+                      setJobsPerPage(value);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // Save and refresh on Enter key
+                    if (e.key === "Enter") {
+                      if (jobsPerPage >= 1 && jobsPerPage <= 100) {
+                        handleJobsPerPageChange(jobsPerPage);
+                      }
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="20"
+                />
+                <button
+                  onClick={() => handleJobsPerPageChange(jobsPerPage)}
+                  className="px-4 py-2 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <span>💾</span>
+                  Save
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-600 mt-2">
+                Click <strong>Save</strong> or press <strong>Enter</strong> to
+                apply changes and refresh the page automatically.
               </p>
             </div>
 

@@ -2,13 +2,8 @@
   "manifest_version": 3,
   "name": "Frevo",
   "version": "1.0",
-  "permissions": [
-    "storage",
-    "activeTab",
-    "scripting",
-    "declarativeNetRequest",
-    "declarativeNetRequestWithHostAccess"
-  ],
+  "description": "AI proposal generation, star filtering, and pagination modifier for Freelancer",
+  "permissions": ["storage", "activeTab", "scripting"],
   "action": {
     "default_popup": "index.html"
   },
@@ -25,7 +20,8 @@
         "*://freelancer.pk/*",
         "*://freelancer.in/*"
       ],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_start"
     }
   ],
   "host_permissions": [
@@ -36,7 +32,21 @@
     "*://freelancer.pk/*",
     "*://freelancer.in/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": [
+        "*://www.freelancer.com/*",
+        "*://www.freelancer.pk/*",
+        "*://www.freelancer.in/*",
+        "*://freelancer.com/*",
+        "*://freelancer.pk/*",
+        "*://freelancer.in/*"
+      ]
+    },
     {
       "resources": ["assets/*"],
       "matches": ["<all_urls>"]

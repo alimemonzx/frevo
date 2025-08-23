@@ -43,6 +43,14 @@ export default defineConfig({
           console.log("✅ background.js copied to dist/");
         }
 
+        // Copy inject.js to root of dist
+        const injectSrc = resolve(__dirname, "public/extension/inject.js");
+        const injectDest = resolve(outDir, "inject.js");
+        if (existsSync(injectSrc)) {
+          copyFileSync(injectSrc, injectDest);
+          console.log("✅ inject.js copied to dist/");
+        }
+
         console.log("✅ Extension files copied to dist/");
       },
     },

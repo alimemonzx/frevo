@@ -20,7 +20,7 @@
         "*://freelancer.pk/*",
         "*://freelancer.in/*"
       ],
-      "js": ["content.js"],
+      "js": ["assets/content.js"],
       "run_at": "document_start"
     }
   ],

@@ -20,6 +20,14 @@ A Chrome extension that enhances your Freelancer.com experience by filtering pro
 - OpenAI integration for AI-powered content generation
 - Secure API key storage in Chrome sync storage
 - Test API connectivity directly from the extension
+- React-based UI components with modern styling
+
+### 📄 Jobs Per Page Control
+
+- **Customizable Pagination**: Set jobs per page from 1 to 100 (default: 20)
+- **Smart Request Interception**: Automatically modifies API requests to use your preferred pagination
+- **Real-time Updates**: Changes apply immediately to new requests
+- **Persistent Settings**: Remembers your pagination preference across sessions
 
 ## Installation
 
@@ -65,20 +73,54 @@ A Chrome extension that enhances your Freelancer.com experience by filtering pro
 4. Click the button to generate AI-powered proposals
 5. The generated proposal will be automatically inserted into the bid form
 
+### Jobs Per Page Control
+
+1. In the **Filter Controls** section, find the "Jobs per page" input field
+2. Enter your desired number of jobs per page (1-100, default: 20)
+3. The setting is automatically saved and applied to future API requests
+4. Navigate to any Freelancer.com search page to see the changes
+5. The pagination will use your custom setting instead of the default 20 jobs per page
+
 ## Development
 
 ### Project Structure
 
 ```
-├── src/
-│   ├── App.tsx              # Extension popup (React)
-│   ├── contentScript.tsx    # Content script (TypeScript)
-│   └── components/          # React components
-├── public/
-│   └── extension/
-│       └── manifest.json    # Extension manifest
-├── dist/                    # Built extension files
-└── package.json
+zero-rating-filter/
+├── src/                     # React source code
+│   ├── App.tsx             # Extension popup (React)
+│   ├── main.tsx            # React entry point
+│   ├── index.css           # Global styles
+│   ├── vite-env.d.ts       # Vite type definitions
+│   └── components/         # React components
+│       ├── Header.tsx      # Extension header
+│       ├── StatusCard.tsx  # Toggle status card
+│       ├── OpenAIKeyInput.tsx # API key input
+│       ├── OpenAIModal.tsx # API key modal
+│       ├── InfoSection.tsx # Information section
+│       ├── Footer.tsx      # Extension footer
+│       └── Icons.tsx       # Icon components
+├── public/                 # Static assets
+│   ├── extension/         # Extension files
+│   │   ├── manifest.json  # Extension manifest
+│   │   ├── content.js     # Content script
+│   │   ├── background.js  # Background service worker
+│   │   ├── inject.js      # Injected script for pagination
+│   │   └── assets/        # Extension assets
+│   │       ├── content.js # Additional content script
+│   │       └── style.css  # Styles for injected components
+│   └── vite.svg           # Vite logo
+├── dist/                  # Built extension files
+├── package.json           # Dependencies and scripts
+├── package-lock.json      # Locked dependencies
+├── tsconfig.json          # TypeScript configuration
+├── tsconfig.app.json      # App-specific TS config
+├── tsconfig.node.json     # Node-specific TS config
+├── vite.config.ts         # Vite build configuration
+├── tailwind.config.js     # Tailwind CSS configuration
+├── postcss.config.js      # PostCSS configuration
+├── eslint.config.js       # ESLint configuration
+└── README.md              # This file
 ```
 
 ### Build Commands
@@ -89,26 +131,79 @@ A Chrome extension that enhances your Freelancer.com experience by filtering pro
 
 ### Adding New Features
 
-1. Modify `src/contentScript.tsx` for page-level functionality
-2. Modify `src/App.tsx` for popup functionality
-3. Update `public/extension/manifest.json` for permissions and configuration
-4. Run `npm run build` to generate updated extension files
+1. **Popup UI**: Modify `src/App.tsx` and components in `src/components/` for popup functionality
+2. **Content Script**: Modify `public/extension/content.js` for page-level functionality
+3. **Background Script**: Modify `public/extension/background.js` for background tasks and request interception
+4. **Injected Scripts**: Modify `public/extension/inject.js` for scripts injected into the page
+5. **Manifest**: Update `public/extension/manifest.json` for permissions and configuration
+6. **Build**: Run `npm run build` to generate updated extension files
+
+### Key Files Explained
+
+- **`src/App.tsx`**: Main popup interface with filter controls and AI settings
+- **`public/extension/content.js`**: Content script that runs on Freelancer.com pages
+- **`public/extension/background.js`**: Background service worker for request interception
+- **`public/extension/inject.js`**: Script injected into pages for pagination control
+- **`public/extension/manifest.json`**: Extension configuration and permissions
 
 ## API Integration
 
 The extension integrates with OpenAI's API for AI-powered writing assistance:
 
-- **Model**: GPT-3.5-turbo
+- **Model**: GPT-4o (latest model)
 - **Storage**: API keys are stored securely in Chrome sync storage
 - **Security**: API keys are never logged or transmitted except to OpenAI's API
 - **Testing**: Built-in API connectivity test
+
+## Technical Architecture
+
+### Request Interception System
+
+The extension uses a multi-layered approach for request interception:
+
+1. **Background Service Worker**: Handles API request interception using Chrome's webRequest API
+2. **Content Script**: Manages UI interactions and communicates with background script
+3. **Injected Script**: Runs in page context to modify pagination behavior
+4. **Message Passing**: Secure communication between different extension contexts
+
+### Storage Strategy
+
+- **Chrome Sync Storage**: For user preferences (filter settings, API keys)
+- **Chrome Local Storage**: For jobs per page setting and temporary data
+- **Persistent Settings**: All user preferences are remembered across sessions
 
 ## Permissions
 
 - `storage` - For saving user preferences and API keys
 - `activeTab` - For accessing current tab content
 - `scripting` - For injecting content scripts
-- Host permissions for Freelancer.com domains
+- Host permissions for Freelancer.com domains (including subdomains)
+
+## Browser Compatibility
+
+- **Chrome**: Full support (tested on Chrome 120+)
+- **Edge**: Full support (Chromium-based)
+- **Firefox**: Limited support (may require manifest adjustments)
+- **Safari**: Not supported (different extension API)
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Extension not loading**: Check that all files are in the correct locations
+2. **Filter not working**: Ensure you're on a search page (`/search/projects`)
+3. **AI button not appearing**: Refresh the page and check console for errors
+4. **Pagination not updating**: Check that the jobs per page setting is saved correctly
+
+### Debug Mode
+
+Enable debug logging by opening the browser console and looking for messages starting with:
+
+- `🎯` - Content script events
+- `📄` - Pagination updates
+- `⭐` - Star rating filter events
+- `✨` - AI assistant events
+- `🔧` - Technical operations
 
 ## Contributing
 

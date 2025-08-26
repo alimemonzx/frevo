@@ -7,6 +7,7 @@ import autoprefixer from "autoprefixer";
 
 export default defineConfig(({ command, mode }) => {
   const isContentBuild = mode === "content";
+  const isAllContentBuild = mode === "all-content"; // New mode for building all content scripts
 
   return {
     base: "./",
@@ -47,14 +48,24 @@ export default defineConfig(({ command, mode }) => {
             console.log("✅ inject.js copied to dist/");
           }
 
+          const interceptorSrc = resolve(
+            __dirname,
+            "public/extension/interceptor.js"
+          );
+          const interceptorDest = resolve(outDir, "interceptor.js");
+          if (existsSync(interceptorSrc)) {
+            copyFileSync(interceptorSrc, interceptorDest);
+            console.log("✅ interceptor.js copied to dist/");
+          }
+
           console.log("✅ Extension files copied to dist/");
         },
       },
-      // 🎯 NEW: Extract CSS content to a variable for manual injection
+      // 🎯 Extract CSS content to a variable for manual injection
       {
         name: "extract-css-content",
         generateBundle(options, bundle) {
-          if (isContentBuild) {
+          if (isContentBuild || isAllContentBuild) {
             // Find the CSS asset that Vite generated
             const cssAssets = Object.keys(bundle).filter((key) =>
               key.endsWith(".css")
@@ -103,13 +114,40 @@ export default defineConfig(({ command, mode }) => {
 
     build: {
       rollupOptions: {
-        input: isContentBuild
-          ? { content: "src/content-script.tsx" }
-          : { popup: "index.html" },
+        input: (() => {
+          if (isContentBuild) {
+            return {
+              content: "src/content-script.tsx",
+              content2: "src/content-script-2.tsx",
+            };
+          } else if (isAllContentBuild) {
+            // Build multiple content scripts at once
+            return {
+              content: "src/content-script.tsx",
+              content2: "src/content-script-2.tsx",
+              // Add more content scripts here as needed
+              // content3: "src/content-script-3.tsx",
+            };
+          } else {
+            return { popup: "index.html" };
+          }
+        })(),
         output: {
-          entryFileNames: isContentBuild
-            ? "assets/content.js"
-            : "assets/[name].js",
+          entryFileNames: (chunkInfo) => {
+            if (isContentBuild && chunkInfo.name === "content") {
+              return "assets/content.js";
+            } else if (isAllContentBuild) {
+              // Map content script names to their output files
+              const contentScriptMap = {
+                content: "assets/content.js",
+                content2: "assets/content2.js",
+                // 'content3': 'assets/content3.js',
+              };
+              return contentScriptMap[chunkInfo.name] || "assets/[name].js";
+            } else {
+              return "assets/[name].js";
+            }
+          },
           chunkFileNames: "assets/[name].js",
           assetFileNames: "assets/[name].[ext]",
           format: "es",
@@ -117,7 +155,7 @@ export default defineConfig(({ command, mode }) => {
         },
       },
       outDir: "dist",
-      emptyOutDir: !isContentBuild,
+      emptyOutDir: !(isContentBuild || isAllContentBuild),
       // 🎯 IMPORTANT: Don't bundle CSS into JS, we'll handle it manually
       cssCodeSplit: true,
       minify: false,

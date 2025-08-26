@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:popup && npm run build:content",
+    "build": "npm run build:popup && npm run build:all-content",
     "build:popup": "vite build",
-    "build:content": "vite build --mode content",
+    "build:all-content": "vite build --mode all-content",
     "lint": "eslint .",
     "preview": "vite preview"
   },

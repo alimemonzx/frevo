@@ -20,7 +20,7 @@
         "*://freelancer.pk/*",
         "*://freelancer.in/*"
       ],
-      "js": ["assets/content.js"],
+      "js": ["assets/content.js", "assets/content2.js"],
       "run_at": "document_start"
     }
   ],
@@ -37,7 +37,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["inject.js"],
+      "resources": ["inject.js", "interceptor.js"],
       "matches": [
         "*://www.freelancer.com/*",
         "*://www.freelancer.pk/*",

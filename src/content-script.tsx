@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import { FrevoAIButton } from "./components/FrevoAIButton";
+import FrevoUser from "./components/FrevoUser";
 
 // 🎯 IMPORT YOUR REAL TAILWIND CSS
 import tailwindStyles from "./index.css?inline";
@@ -169,14 +170,14 @@ class ExtensionStateManager {
         all: initial;
         display: inline-block;
       }
-      
+
       * {
         box-sizing: border-box;
       }
 
       /* Your real Tailwind CSS from node_modules */
       ${tailwindStyles}
-      
+
       /* Additional alignment and sizing styles */
       #frevo-react-root {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -230,9 +231,7 @@ class ExtensionStateManager {
 
     try {
       // Create shadow DOM container with alignment
-      const { container, shadowRoot, mountPoint } = this.createShadowContainer(
-        aiButton.parentElement
-      );
+      const { mountPoint } = this.createShadowContainer(aiButton.parentElement);
 
       // Create React root inside shadow DOM
       const root = createRoot(mountPoint);
@@ -433,6 +432,59 @@ class ExtensionStateManager {
     this.state.scriptInjected = true;
   }
 
+  private injectIntoCardBody(image: string, name: string, username: string) {
+    // Look for the ProjectDetailsCard-title element
+    const projectTitle = document.querySelector(
+      ".ProjectDetailsCard-title.ng-star-inserted"
+    );
+
+    if (!projectTitle || projectTitle.querySelector("#extension-analyzer")) {
+      return;
+    }
+
+    const container = document.createElement("div");
+    container.id = "extension-analyzer";
+
+    // 🎯 CREATE SHADOW DOM WITH PROPER STYLING
+    const shadowRoot = container.attachShadow({ mode: "open" });
+
+    // 🔥 INJECT TAILWIND CSS INTO SHADOW DOM (same as createShadowContainer)
+    const style = document.createElement("style");
+    style.textContent = `
+    /* Reset and base styles for shadow DOM */
+    :host {
+      all: initial;
+      display: block;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    /* Your real Tailwind CSS from node_modules */
+    ${tailwindStyles}
+
+    /* Additional styles for FrevoUser component */
+    #frevo-user-root {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+  `;
+
+    // Create mount point inside shadow DOM
+    const mountPoint = document.createElement("div");
+    mountPoint.id = "frevo-user-root";
+
+    // Add styles and mount point to shadow DOM
+    shadowRoot.appendChild(style);
+    shadowRoot.appendChild(mountPoint);
+
+    // Create React root inside shadow DOM with styles
+    const root = createRoot(mountPoint);
+    root.render(<FrevoUser image={image} name={name} username={username} />);
+
+    // Insert right after the ProjectDetailsCard-title element
+    projectTitle.insertAdjacentElement("afterend", container);
+  }
   private setupEventListeners(): void {
     chrome.storage.onChanged.addListener((changes, namespace) => {
       if (namespace === "local" && changes.jobsPerPage) {
@@ -465,6 +517,24 @@ class ExtensionStateManager {
             },
             "*"
           );
+          break;
+        case "OWNER_API_INTERCEPTED":
+          fetch(
+            `https://www.freelancer.com/api/users/0.1/users?role=employer&rehire_rates=true&users%5B%5D=${event.data.owner_id}&retention_rate=true&webapp=1&compact=true&new_errors=true&new_pools=true&employer_reputation=true&avatar=true`
+          )
+            .then((response) => response.json())
+            .then((data) => {
+              const user_data = data.result.users;
+              const keys = Object.keys(user_data);
+              const user = user_data[keys[0]];
+              console.log("🔄 user dataaa:", user_data[keys[0]]);
+
+              this.injectIntoCardBody(
+                user.avatar_large_cdn,
+                user.public_name,
+                user.username
+              );
+            });
           break;
       }
     });

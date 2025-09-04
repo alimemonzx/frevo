@@ -1,4 +1,153 @@
 import React, { useState, useEffect } from "react";
+import styled from "styled-components";
+
+// Styled Components
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+`;
+
+const ModalContent = styled.div`
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  width: 24rem;
+  max-width: 90vw;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+`;
+
+const ModalTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+`;
+
+const CloseButton = styled.button`
+  color: #9ca3af;
+  transition: color 0.2s ease-in-out;
+  border: none;
+  background: none;
+  cursor: pointer;
+
+  &:hover {
+    color: #4b5563;
+  }
+`;
+
+const CloseIcon = styled.svg`
+  width: 1.5rem;
+  height: 1.5rem;
+`;
+
+const FormContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const InputGroup = styled.div``;
+
+const Label = styled.label`
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+`;
+
+const Input = styled.input`
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease-in-out;
+
+  &:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: #a855f7;
+    border-color: transparent;
+  }
+`;
+
+const TestButton = styled.button`
+  width: 100%;
+  background: linear-gradient(to right, #8b5cf6, #2563eb);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background: linear-gradient(to right, #7c3aed, #1d4ed8);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const AlertBox = styled.div<{ $type: "error" | "success" }>`
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  border: 1px solid;
+
+  ${(props) =>
+    props.$type === "error"
+      ? `
+    background-color: #fef2f2;
+    border-color: #fecaca;
+  `
+      : `
+    background-color: #f0fdf4;
+    border-color: #bbf7d0;
+  `}
+`;
+
+const AlertText = styled.p<{ $type: "error" | "success" }>`
+  font-size: 0.875rem;
+  margin: 0;
+
+  ${(props) =>
+    props.$type === "error"
+      ? `
+    color: #b91c1c;
+  `
+      : `
+    color: #15803d;
+  `}
+`;
+
+const ResponseLabel = styled.p`
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  margin-top: 0;
+  color: #15803d;
+`;
+
+const ResponseText = styled.p`
+  font-size: 0.875rem;
+  color: #16a34a;
+  margin: 0;
+`;
 
 interface OpenAIModalProps {
   isOpen: boolean;
@@ -79,69 +228,55 @@ export const OpenAIModal: React.FC<OpenAIModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[999999]">
-      <div className="bg-white rounded-lg p-6 w-96 max-w-[90vw] shadow-xl">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Frevo AI Settings</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+    <ModalOverlay>
+      <ModalContent>
+        <ModalHeader>
+          <ModalTitle>Frevo AI Settings</ModalTitle>
+          <CloseButton onClick={onClose}>
+            <CloseIcon fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M6 18L18 6M6 6l12 12"
               />
-            </svg>
-          </button>
-        </div>
+            </CloseIcon>
+          </CloseButton>
+        </ModalHeader>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              OpenAI API Key
-            </label>
-            <input
+        <FormContainer>
+          <InputGroup>
+            <Label>OpenAI API Key</Label>
+            <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               onBlur={saveApiKey}
               placeholder="sk-..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
-          </div>
+          </InputGroup>
 
-          <button
+          <TestButton
             onClick={callOpenAI}
             disabled={isLoading || !apiKey.trim()}
-            className="w-full bg-gradient-to-r from-purple-500 to-blue-600 text-white py-2 px-4 rounded-md font-medium hover:from-purple-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
           >
             {isLoading ? "Calling OpenAI..." : "Test API Call"}
-          </button>
+          </TestButton>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-3">
-              <p className="text-red-700 text-sm">{error}</p>
-            </div>
+            <AlertBox $type="error">
+              <AlertText $type="error">{error}</AlertText>
+            </AlertBox>
           )}
 
           {response && (
-            <div className="bg-green-50 border border-green-200 rounded-md p-3">
-              <p className="text-green-700 text-sm font-medium mb-1">
-                Response:
-              </p>
-              <p className="text-green-600 text-sm">{response}</p>
-            </div>
+            <AlertBox $type="success">
+              <ResponseLabel>Response:</ResponseLabel>
+              <ResponseText>{response}</ResponseText>
+            </AlertBox>
           )}
-        </div>
-      </div>
-    </div>
+        </FormContainer>
+      </ModalContent>
+    </ModalOverlay>
   );
 };

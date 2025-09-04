@@ -1,19 +1,62 @@
+import styled from "styled-components";
+
 interface HeaderProps {
   FilterIcon: React.ComponentType;
 }
 
+const HeaderContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+`;
+
+const HeaderContent = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const IconContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: linear-gradient(to right, #3b82f6, #4f46e5);
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+`;
+
+const TextContainer = styled.div`
+  margin-left: 0.5rem;
+`;
+
+const Title = styled.h1`
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+`;
+
+const Subtitle = styled.p`
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+`;
+
 export const Header: React.FC<HeaderProps> = ({ FilterIcon }) => {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center">
-        <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg">
+    <HeaderContainer>
+      <HeaderContent>
+        <IconContainer>
           <FilterIcon />
-        </div>
-        <div className="ml-2">
-          <h1 className="text-base font-bold text-gray-900">Frevo</h1>
-          <p className="text-xs text-gray-500">Freelancer.com Enhancement</p>
-        </div>
-      </div>
-    </div>
+        </IconContainer>
+        <TextContainer>
+          <Title>Frevo</Title>
+          <Subtitle>Freelancer.com Enhancement</Subtitle>
+        </TextContainer>
+      </HeaderContent>
+    </HeaderContainer>
   );
 };

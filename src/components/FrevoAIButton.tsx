@@ -1,43 +1,119 @@
 // src/components/FrevoComponents.tsx
 import React, { useState } from "react";
+import styled, { keyframes } from "styled-components";
+
+// Animations
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+// Styled Components
+const IconSvg = styled.svg<{ $isSpinning?: boolean }>`
+  width: 1rem;
+  height: 1rem;
+  animation: ${(props) => (props.$isSpinning ? spin : "none")} 1s linear
+    infinite;
+`;
 
 // Lightning Icon Component
-export const LightningIcon: React.FC<{ className?: string }> = ({
-  className = "w-4 h-4",
-}) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-  >
+export const LightningIcon: React.FC = () => (
+  <IconSvg viewBox="0 0 24 24" fill="none" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
       d="M13 10V3L4 14h7v7l9-11h-7z"
     />
-  </svg>
+  </IconSvg>
 );
 
 // Spinner Icon Component
-export const SpinnerIcon: React.FC<{ className?: string }> = ({
-  className = "w-4 h-4 animate-spin",
-}) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-  >
+export const SpinnerIcon: React.FC = () => (
+  <IconSvg $isSpinning viewBox="0 0 24 24" fill="none" stroke="currentColor">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
     />
-  </svg>
+  </IconSvg>
 );
+
+// Styled Button Component
+const StyledButton = styled.button<{
+  $variant: "primary" | "secondary";
+  $size: "sm" | "md" | "lg";
+  $isLoading: boolean;
+}>`
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  border-radius: 0.375rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  color: white;
+
+  /* Size variants */
+  ${(props) => {
+    switch (props.$size) {
+      case "sm":
+        return `
+          padding: 0.375rem 0.75rem;
+          font-size: 0.875rem;
+        `;
+      case "lg":
+        return `
+          padding: 0.75rem 1.5rem;
+          font-size: 1.125rem;
+        `;
+      default:
+        return `
+          padding: 0.5rem 1rem;
+          font-size: 1rem;
+        `;
+    }
+  }}
+
+  /* Color variants */
+  ${(props) => {
+    switch (props.$variant) {
+      case "secondary":
+        return `
+          background: linear-gradient(to right, #6b7280, #4b5563);
+          &:hover {
+            background: linear-gradient(to right, #4b5563, #374151);
+          }
+        `;
+      default:
+        return `
+          background: linear-gradient(to right, #8b5cf6, #2563eb);
+          &:hover {
+            background: linear-gradient(to right, #7c3aed, #1d4ed8);
+          }
+        `;
+    }
+  }}
+  
+  &:hover {
+    transform: translateY(-0.125rem);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
 
 // Props interface for FrevoButton
 interface FrevoButtonProps {
@@ -156,36 +232,13 @@ export const FrevoAIButton: React.FC<FrevoButtonProps> = ({
     }
   };
 
-  // Size classes
-  const sizeClasses = {
-    sm: "px-3 py-1.5 text-sm",
-    md: "px-4 py-2",
-    lg: "px-6 py-3 text-lg",
-  };
-
-  // Variant classes
-  const variantClasses = {
-    primary:
-      "bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700",
-    secondary:
-      "bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700",
-  };
-
   return (
-    <button
+    <StyledButton
       onClick={handleClick}
       disabled={isLoading}
-      className={`
-        relative inline-flex items-center gap-2 
-        ${sizeClasses[size]}
-        ${variantClasses[variant]}
-        text-white font-semibold rounded-md shadow-lg 
-        hover:-translate-y-0.5 active:translate-y-0 
-        disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none
-        transition-all duration-200
-      `
-        .trim()
-        .replace(/\s+/g, " ")}
+      $variant={variant}
+      $size={size}
+      $isLoading={isLoading}
     >
       {isLoading ? (
         <>
@@ -198,7 +251,7 @@ export const FrevoAIButton: React.FC<FrevoButtonProps> = ({
           <span>Write with Frevo</span>
         </>
       )}
-    </button>
+    </StyledButton>
   );
 };
 

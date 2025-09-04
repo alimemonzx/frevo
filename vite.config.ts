@@ -2,8 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { copyFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import tailwindcss from "tailwindcss";
-import autoprefixer from "autoprefixer";
 
 export default defineConfig(({ command, mode }) => {
   const isContentBuild = mode === "content";
@@ -61,56 +59,7 @@ export default defineConfig(({ command, mode }) => {
           console.log("✅ Extension files copied to dist/");
         },
       },
-      // 🎯 Extract CSS content to a variable for manual injection
-      {
-        name: "extract-css-content",
-        generateBundle(options, bundle) {
-          if (isContentBuild || isAllContentBuild) {
-            // Find the CSS asset that Vite generated
-            const cssAssets = Object.keys(bundle).filter((key) =>
-              key.endsWith(".css")
-            );
-
-            if (cssAssets.length > 0) {
-              const cssAsset = bundle[cssAssets[0]];
-              if (
-                cssAsset.type === "asset" &&
-                typeof cssAsset.source === "string"
-              ) {
-                const cssContent = cssAsset.source;
-
-                // Create a JS file that exports the CSS content
-                const cssExportContent = `
-                  // Generated CSS content for manual injection
-                  export const CSS_CONTENT = \`${cssContent.replace(
-                    /`/g,
-                    "\\`"
-                  )}\`;
-                `;
-
-                // Write the CSS content as a JS module
-                this.emitFile({
-                  type: "asset",
-                  fileName: "tailwind-css-content.js",
-                  source: cssExportContent,
-                });
-
-                console.log("✅ CSS content extracted for manual injection");
-              }
-
-              // Remove the CSS file since we'll inject it manually
-              delete bundle[cssAssets[0]];
-            }
-          }
-        },
-      },
     ],
-
-    css: {
-      postcss: {
-        plugins: [tailwindcss, autoprefixer],
-      },
-    },
 
     build: {
       rollupOptions: {
@@ -156,10 +105,9 @@ export default defineConfig(({ command, mode }) => {
       },
       outDir: "dist",
       emptyOutDir: !(isContentBuild || isAllContentBuild),
-      // 🎯 IMPORTANT: Don't bundle CSS into JS, we'll handle it manually
+      // Now using styled-components, so normal CSS handling is fine
       cssCodeSplit: true,
-      minify: false,
-      cssMinify: false,
+      minify: true,
     },
   };
 });

@@ -3,7 +3,7 @@
   "name": "Frevo",
   "version": "1.0",
   "description": "AI proposal generation, star filtering, and pagination modifier for Freelancer",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab", "scripting", "identity"],
   "action": {
     "default_popup": "index.html"
   },
@@ -30,8 +30,13 @@
     "*://www.freelancer.in/*",
     "*://freelancer.com/*",
     "*://freelancer.pk/*",
-    "*://freelancer.in/*"
+    "*://freelancer.in/*",
+    "https://www.googleapis.com/*"
   ],
+  "oauth2": {
+    "client_id": "638436431388-2d5k620bra8g7ddk9f7t71769o9u6knl.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },

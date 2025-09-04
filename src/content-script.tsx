@@ -1,10 +1,8 @@
-import React from "react";
-import { createRoot, Root } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { FrevoAIButton } from "./components/FrevoAIButton";
 import FrevoUser from "./components/FrevoUser";
 
-// 🎯 IMPORT YOUR REAL TAILWIND CSS
-import tailwindStyles from "./index.css?inline";
+// No more Tailwind CSS imports needed - using styled-components!
 
 interface ExtensionState {
   filterEnabled: boolean;
@@ -162,7 +160,7 @@ class ExtensionStateManager {
     const mountPoint = document.createElement("div");
     mountPoint.id = "frevo-react-root";
 
-    // 🔥 INJECT TAILWIND CSS INTO SHADOW DOM WITH BUTTON ALIGNMENT STYLES
+    // 🔥 MINIMAL CSS FOR SHADOW DOM - styled-components handles everything else!
     const style = document.createElement("style");
     style.textContent = `
       /* Reset and base styles for shadow DOM */
@@ -174,9 +172,6 @@ class ExtensionStateManager {
       * {
         box-sizing: border-box;
       }
-
-      /* Your real Tailwind CSS from node_modules */
-      ${tailwindStyles}
 
       /* Additional alignment and sizing styles */
       #frevo-react-root {
@@ -194,11 +189,6 @@ class ExtensionStateManager {
         justify-content: center;
         white-space: nowrap;
         vertical-align: middle;
-      }
-
-      /* Ensure consistent button styling */
-      #frevo-react-root .inline-flex {
-        align-items: center !important;
       }
     `;
 
@@ -448,7 +438,7 @@ class ExtensionStateManager {
     // 🎯 CREATE SHADOW DOM WITH PROPER STYLING
     const shadowRoot = container.attachShadow({ mode: "open" });
 
-    // 🔥 INJECT TAILWIND CSS INTO SHADOW DOM (same as createShadowContainer)
+    // 🔥 MINIMAL CSS FOR SHADOW DOM - styled-components handles everything else!
     const style = document.createElement("style");
     style.textContent = `
     /* Reset and base styles for shadow DOM */
@@ -460,9 +450,6 @@ class ExtensionStateManager {
     * {
       box-sizing: border-box;
     }
-
-    /* Your real Tailwind CSS from node_modules */
-    ${tailwindStyles}
 
     /* Additional styles for FrevoUser component */
     #frevo-user-root {
@@ -539,7 +526,7 @@ class ExtensionStateManager {
       }
     });
 
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       this.handleExtensionMessage(message, sendResponse);
       return true;
     });
@@ -548,8 +535,8 @@ class ExtensionStateManager {
   }
 
   private async handleExtensionMessage(
-    message: any,
-    sendResponse: (response: any) => void
+    message: { action: string; minStarRating?: number; jobsPerPage?: number },
+    sendResponse: (response: { success: boolean; error?: string }) => void
   ): Promise<void> {
     try {
       switch (message.action) {
@@ -566,6 +553,27 @@ class ExtensionStateManager {
           if (this.isSearchPage()) {
             await this.restoreAllProjects();
           }
+          break;
+
+        case "disable-and-reload":
+          // Complete cleanup and prepare for reload
+          this.state.filterEnabled = false;
+          this.state.minStarRating = 0;
+          this.state.jobsPerPage = 20;
+          this.state.projectDescription = "";
+
+          // Cleanup any injected components
+          await this.cleanupFrevoButton();
+
+          // Restore all projects if on search page
+          if (this.isSearchPage()) {
+            await this.restoreAllProjects();
+          }
+
+          // Clear any intervals or observers
+          this.cleanup();
+
+          console.log("🔄 Extension disabled - page will reload");
           break;
 
         case "update-rating":
@@ -600,7 +608,10 @@ class ExtensionStateManager {
       sendResponse({ success: true });
     } catch (error) {
       console.error("❌ Error handling message:", error);
-      sendResponse({ success: false, error: error.message });
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   }
 

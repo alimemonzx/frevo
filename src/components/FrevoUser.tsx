@@ -1,4 +1,5 @@
 import React from "react";
+import styled from "styled-components";
 
 interface FrevoUserProps {
   image: string;
@@ -6,28 +7,52 @@ interface FrevoUserProps {
   username: string;
 }
 
+const UserContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const ImageContainer = styled.div`
+  flex-shrink: 0;
+`;
+
+const UserImage = styled.img`
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+`;
+
+const UserInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
+const UserName = styled.span`
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+`;
+
+const Username = styled.span`
+  font-size: 0.75rem;
+  color: #6b7280;
+`;
+
 const FrevoUser: React.FC<FrevoUserProps> = ({ image, name, username }) => {
   const shouldShowUsername = name !== username;
 
   return (
-    <div className="flex items-center space-x-3">
-      {/* User Image */}
-      <div className="flex-shrink-0">
-        <img
-          src={image}
-          alt={`${name}'s profile`}
-          className="w-8 h-8 rounded-full object-cover"
-        />
-      </div>
-
-      {/* User Info */}
-      <div className="flex flex-col">
-        <span className="text-sm font-medium text-gray-900">{name}</span>
-        {shouldShowUsername && (
-          <span className="text-xs text-gray-500">@{username}</span>
-        )}
-      </div>
-    </div>
+    <UserContainer>
+      <ImageContainer>
+        <UserImage src={image} alt={`${name}'s profile`} />
+      </ImageContainer>
+      <UserInfo>
+        <UserName>{name}</UserName>
+        {shouldShowUsername && <Username>@{username}</Username>}
+      </UserInfo>
+    </UserContainer>
   );
 };
 

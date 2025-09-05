@@ -31,10 +31,11 @@
     "*://freelancer.com/*",
     "*://freelancer.pk/*",
     "*://freelancer.in/*",
-    "https://www.googleapis.com/*"
+    "https://www.googleapis.com/*",
+    "http://localhost:3000/*"
   ],
   "oauth2": {
-    "client_id": "638436431388-2d5k620bra8g7ddk9f7t71769o9u6knl.apps.googleusercontent.com",
+    "client_id": "638436431388-94mqrvferu8sv2kqsln39c55jdn2760d.apps.googleusercontent.com",
     "scopes": ["openid", "email", "profile"]
   },
   "content_security_policy": {

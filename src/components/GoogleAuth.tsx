@@ -165,18 +165,69 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
 
+  const checkExistingAuth = React.useCallback(async () => {
+    try {
+      const result = await chrome.storage.local.get([
+        "authToken",
+        "user",
+        "lastAuthTime",
+      ]);
+
+      if (result.authToken && result.user && result.lastAuthTime) {
+        // Check if auth is still valid (less than 24 hours old)
+        const authAge = Date.now() - result.lastAuthTime;
+        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+        if (authAge < maxAge) {
+          console.log("✅ Found valid existing auth, auto-signing in");
+          onAuthSuccess(result.user);
+          return;
+        } else {
+          console.log("⚠️ Existing auth expired, clearing storage");
+          await chrome.storage.local.remove([
+            "authToken",
+            "user",
+            "lastAuthTime",
+          ]);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking existing auth:", error);
+    }
+  }, [onAuthSuccess]);
+
+  // Check for existing authentication on component mount
+  React.useEffect(() => {
+    checkExistingAuth();
+  }, [checkExistingAuth]);
+
   const handleGoogleAuth = async () => {
     setIsLoading(true);
 
     try {
       if (typeof chrome !== "undefined" && chrome.identity) {
-        // Use Chrome Identity API for OAuth
-        chrome.identity.getAuthToken(
+        // Use Chrome Identity API to get ID token directly
+        const clientId =
+          "638436431388-94mqrvferu8sv2kqsln39c55jdn2760d.apps.googleusercontent.com";
+        const redirectUrl = chrome.identity.getRedirectURL();
+
+        // Create OAuth URL for ID token
+        const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+        authUrl.searchParams.set("client_id", clientId);
+        authUrl.searchParams.set("response_type", "id_token");
+        authUrl.searchParams.set("redirect_uri", redirectUrl);
+        authUrl.searchParams.set("scope", "openid email profile");
+        authUrl.searchParams.set(
+          "nonce",
+          Math.random().toString(36).substring(2, 15)
+        );
+
+        chrome.identity.launchWebAuthFlow(
           {
+            url: authUrl.toString(),
             interactive: true,
-            scopes: ["openid", "email", "profile"],
           },
-          async (token) => {
+          async (responseUrl) => {
             if (chrome.runtime.lastError) {
               console.error("Auth error:", chrome.runtime.lastError);
               setIsLoading(false);
@@ -186,53 +237,51 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
               return;
             }
 
-            if (!token) {
+            if (!responseUrl) {
               setIsLoading(false);
-              onAuthError("No token received");
+              onAuthError("No response URL received");
               return;
             }
 
             try {
-              // Get user info from Google API
-              const response = await fetch(
-                `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${token}`
-              );
+              // Extract id_token from the response URL
+              const url = new URL(responseUrl);
 
-              if (!response.ok) {
-                throw new Error("Failed to fetch user info");
+              // ID token might be in URL params or fragment
+              let idToken = url.searchParams.get("id_token");
+
+              // If not in search params, check the fragment (hash)
+              if (!idToken && url.hash) {
+                const hashParams = new URLSearchParams(url.hash.substring(1));
+                idToken = hashParams.get("id_token");
               }
 
-              const userInfo = await response.json();
+              if (!idToken) {
+                console.error("❌ No ID token received from Google");
+                setIsLoading(false);
+                onAuthError("No ID token received from Google");
+                return;
+              }
 
-              const user = {
-                email: userInfo.email,
-                name: userInfo.name,
-                picture: userInfo.picture,
-              };
+              // Decode the ID token to get user info
+              const userInfo = decodeIdToken(idToken);
 
-              console.log("✅ Google auth successful:", user);
-              onAuthSuccess(user);
-              setIsLoading(false);
+              // Call your API with the actual Google ID token
+              await callYourAPI(idToken, userInfo);
             } catch (apiError) {
-              console.error("Error fetching user info:", apiError);
+              console.error("Error processing auth response:", apiError);
               setIsLoading(false);
-              onAuthError("Failed to get user information");
+              onAuthError("Failed to process authentication response");
             }
           }
         );
       } else {
-        // Fallback for development or if Chrome Identity API is not available
-        console.warn("Chrome Identity API not available, using mock auth");
-        setTimeout(() => {
-          const mockUser = {
-            email: "user@example.com",
-            name: "John Doe",
-            picture: "https://via.placeholder.com/40",
-          };
-
-          onAuthSuccess(mockUser);
-          setIsLoading(false);
-        }, 2000);
+        // Chrome Identity API is not available
+        console.error("Chrome Identity API not available");
+        setIsLoading(false);
+        onAuthError(
+          "Chrome Identity API is not available. Please ensure you're running this as a Chrome extension."
+        );
       }
     } catch (error) {
       setIsLoading(false);
@@ -241,6 +290,129 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
       );
     }
   };
+
+  const decodeIdToken = (idToken: string) => {
+    try {
+      // Decode the JWT payload (without verification)
+      const parts = idToken.split(".");
+      if (parts.length !== 3) {
+        throw new Error("Invalid JWT format");
+      }
+
+      const payload = parts[1];
+      const decodedPayload = atob(
+        payload.replace(/-/g, "+").replace(/_/g, "/")
+      );
+      const claims = JSON.parse(decodedPayload);
+
+      // Validate required claims
+      if (!claims.email) {
+        throw new Error("Email not found in idToken");
+      }
+      if (!claims.name) {
+        throw new Error("Name not found in idToken");
+      }
+
+      return {
+        email: claims.email,
+        name: claims.name,
+        picture: claims.picture || "",
+      };
+    } catch (error) {
+      console.error("Error decoding idToken:", error);
+      throw new Error(
+        `Failed to decode idToken: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  };
+
+  const callYourAPI = async (
+    idToken: string,
+    userInfo: { email: string; name: string; picture: string }
+  ) => {
+    try {
+      console.log("🔄 Sending auth request to backend");
+
+      const response = await fetch(
+        "http://localhost:3000/api/auth/google-signin",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            idToken: idToken,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Backend auth failed:", response.status, errorText);
+        throw new Error(
+          `Backend authentication failed: ${response.status} - ${errorText}`
+        );
+      }
+
+      const apiResult = await response.json();
+      console.log("✅ Authentication successful");
+
+      // Store authentication data in Chrome storage for persistence
+      if (apiResult.token || apiResult.accessToken || apiResult.jwt) {
+        const authToken =
+          apiResult.token || apiResult.accessToken || apiResult.jwt;
+        await chrome.storage.local.set({
+          authToken: authToken,
+          user: userInfo,
+          lastAuthTime: Date.now(),
+        });
+        console.log("✅ Auth data stored");
+      }
+
+      // Store any additional user data from backend
+      if (apiResult.user) {
+        const backendUser = {
+          ...userInfo,
+          ...apiResult.user, // Merge backend user data
+        };
+
+        await chrome.storage.local.set({
+          user: backendUser,
+        });
+
+        onAuthSuccess(backendUser);
+      } else {
+        onAuthSuccess(userInfo);
+      }
+
+      setIsLoading(false);
+    } catch (apiError) {
+      console.error("❌ Error calling backend API:", apiError);
+      setIsLoading(false);
+      onAuthError(
+        apiError instanceof Error
+          ? apiError.message
+          : "Failed to authenticate with server"
+      );
+    }
+  };
+
+  // Utility function to logout (can be called from other components)
+  const logout = React.useCallback(async () => {
+    try {
+      await chrome.storage.local.remove(["authToken", "user", "lastAuthTime"]);
+      console.log("✅ User logged out, auth data cleared");
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+  }, []);
+
+  // Make logout function available globally
+  React.useEffect(() => {
+    (window as { frevoLogout?: () => Promise<void> }).frevoLogout = logout;
+  }, [logout]);
 
   return (
     <AuthContainer>

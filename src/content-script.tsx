@@ -1,8 +1,14 @@
 import { createRoot, type Root } from "react-dom/client";
-import { FrevoAIButton } from "./components/FrevoAIButton";
-import FrevoUser from "./components/FrevoUser";
+import { FrevoAIButton } from "./components/FrevoAiButton/FrevoAIButton";
+import FrevoUser from "./components/FrevoUser/FrevoUser";
+import {
+  fetchUserProfile,
+  fetchJobOwnerDetails,
+  getAuthToken,
+  type UserProfile,
+} from "./utils/auth";
 
-// No more Tailwind CSS imports needed - using styled-components!
+// Using CSS modules for extension-compatible styling!
 
 interface ExtensionState {
   filterEnabled: boolean;
@@ -16,6 +22,8 @@ interface ExtensionState {
   isInitializing: boolean;
   reactRoot: Root | null;
   shadowRoot: ShadowRoot | null;
+  userProfile: UserProfile | null;
+  isUserProfileLoading: boolean;
 }
 
 class ExtensionStateManager {
@@ -31,6 +39,8 @@ class ExtensionStateManager {
     isInitializing: false,
     reactRoot: null,
     shadowRoot: null,
+    userProfile: null,
+    isUserProfileLoading: false,
   };
 
   private urlCheckInterval: number | null = null;
@@ -50,6 +60,7 @@ class ExtensionStateManager {
   private async start() {
     try {
       await this.loadStorageData();
+      await this.loadUserProfile();
       this.setupEventListeners();
       this.setupUrlChangeDetection();
       this.injectPaginationScript();
@@ -80,6 +91,25 @@ class ExtensionStateManager {
         });
       });
     });
+  }
+
+  private async loadUserProfile(): Promise<void> {
+    try {
+      const authToken = await getAuthToken();
+      if (!authToken) {
+        console.log("No auth token available, skipping user profile load");
+        return;
+      }
+
+      this.state.isUserProfileLoading = true;
+      const profileResponse = await fetchUserProfile();
+      this.state.userProfile = profileResponse.user;
+      console.log("✅ User profile loaded:", this.state.userProfile);
+    } catch (error) {
+      console.error("❌ Failed to load user profile:", error);
+    } finally {
+      this.state.isUserProfileLoading = false;
+    }
   }
 
   private isDetailPage(): boolean {
@@ -137,6 +167,37 @@ class ExtensionStateManager {
     }
   }
 
+  // 🎨 INJECT CSS MODULES INTO SHADOW DOM
+  private async injectCSSModules(shadowRoot: ShadowRoot): Promise<void> {
+    try {
+      // Try to fetch the CSS file from extension assets
+      const possiblePaths = ["assets/style.css", "assets/style"];
+
+      for (const path of possiblePaths) {
+        try {
+          const cssUrl = chrome.runtime.getURL(path);
+          const response = await fetch(cssUrl);
+          if (response.ok) {
+            const css = await response.text();
+            const cssStyle = document.createElement("style");
+            cssStyle.textContent = css;
+            shadowRoot.appendChild(cssStyle);
+            console.log("✅ CSS modules loaded successfully from:", path);
+            return;
+          }
+        } catch {
+          // Continue to next path
+        }
+      }
+
+      console.log(
+        "⚠️ CSS modules file not found, components will use fallback styles"
+      );
+    } catch (error) {
+      console.log("⚠️ Error loading CSS modules:", error);
+    }
+  }
+
   // 🚀 CREATE SHADOW DOM WITH PROPER BUTTON ALIGNMENT
   private createShadowContainer(parentElement: Element): {
     container: HTMLElement;
@@ -160,7 +221,7 @@ class ExtensionStateManager {
     const mountPoint = document.createElement("div");
     mountPoint.id = "frevo-react-root";
 
-    // 🔥 MINIMAL CSS FOR SHADOW DOM - styled-components handles everything else!
+    // 🔥 CSS FOR SHADOW DOM - Including CSS modules and base styles!
     const style = document.createElement("style");
     style.textContent = `
       /* Reset and base styles for shadow DOM */
@@ -191,6 +252,9 @@ class ExtensionStateManager {
         vertical-align: middle;
       }
     `;
+
+    // Inject CSS modules styles into shadow DOM
+    this.injectCSSModules(shadowRoot);
 
     // Add styles and mount point to shadow DOM
     shadowRoot.appendChild(style);
@@ -336,7 +400,7 @@ class ExtensionStateManager {
     this.urlCheckInterval = window.setInterval(
       () => this.checkUrlChange(),
       2000
-    );
+    ) as number;
 
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
@@ -391,7 +455,7 @@ class ExtensionStateManager {
         if (!this.state.projectDescription) {
           this.extractProjectDescription();
         }
-      }, 250);
+      }, 250) as number;
     });
 
     this.state.observer.observe(document.body, {
@@ -422,7 +486,7 @@ class ExtensionStateManager {
     this.state.scriptInjected = true;
   }
 
-  private injectIntoCardBody(image: string, name: string, username: string) {
+  private async injectFrevoUserWithBackendData(ownerId?: string) {
     // Look for the ProjectDetailsCard-title element
     const projectTitle = document.querySelector(
       ".ProjectDetailsCard-title.ng-star-inserted"
@@ -438,7 +502,7 @@ class ExtensionStateManager {
     // 🎯 CREATE SHADOW DOM WITH PROPER STYLING
     const shadowRoot = container.attachShadow({ mode: "open" });
 
-    // 🔥 MINIMAL CSS FOR SHADOW DOM - styled-components handles everything else!
+    // 🔥 CSS FOR SHADOW DOM - Including CSS modules and base styles!
     const style = document.createElement("style");
     style.textContent = `
     /* Reset and base styles for shadow DOM */
@@ -457,6 +521,9 @@ class ExtensionStateManager {
     }
   `;
 
+    // Inject CSS modules styles into shadow DOM
+    this.injectCSSModules(shadowRoot);
+
     // Create mount point inside shadow DOM
     const mountPoint = document.createElement("div");
     mountPoint.id = "frevo-user-root";
@@ -467,11 +534,45 @@ class ExtensionStateManager {
 
     // Create React root inside shadow DOM with styles
     const root = createRoot(mountPoint);
-    root.render(<FrevoUser image={image} name={name} username={username} />);
+
+    // Handle job owner details fetching
+    const handleViewDetails = async () => {
+      if (!ownerId) {
+        throw new Error("Owner ID not available");
+      }
+
+      try {
+        const jobOwnerResponse = await fetchJobOwnerDetails(ownerId);
+        console.log("✅ Job owner details fetched:", jobOwnerResponse);
+
+        // Update usage in the extension popup
+        chrome.runtime.sendMessage({
+          type: "UPDATE_USAGE",
+          usageType: "profile_views",
+        });
+
+        return jobOwnerResponse;
+      } catch (error) {
+        console.error("❌ Failed to fetch job owner details:", error);
+        throw error;
+      }
+    };
+
+    // Use placeholder data initially - real data will be fetched when eye icon is clicked
+    root.render(
+      <FrevoUser
+        image={chrome.runtime.getURL("avatar.jpg")}
+        name="Loading..."
+        username="loading"
+        packageType={this.state.userProfile?.package_type}
+        onViewDetails={handleViewDetails}
+      />
+    );
 
     // Insert right after the ProjectDetailsCard-title element
     projectTitle.insertAdjacentElement("afterend", container);
   }
+
   private setupEventListeners(): void {
     chrome.storage.onChanged.addListener((changes, namespace) => {
       if (namespace === "local" && changes.jobsPerPage) {
@@ -506,22 +607,12 @@ class ExtensionStateManager {
           );
           break;
         case "OWNER_API_INTERCEPTED":
-          fetch(
-            `https://www.freelancer.com/api/users/0.1/users?role=employer&rehire_rates=true&users%5B%5D=${event.data.owner_id}&retention_rate=true&webapp=1&compact=true&new_errors=true&new_pools=true&employer_reputation=true&avatar=true`
-          )
-            .then((response) => response.json())
-            .then((data) => {
-              const user_data = data.result.users;
-              const keys = Object.keys(user_data);
-              const user = user_data[keys[0]];
-              console.log("🔄 user dataaa:", user_data[keys[0]]);
-
-              this.injectIntoCardBody(
-                user.avatar_large_cdn,
-                user.public_name,
-                user.username
-              );
-            });
+          // No longer using intercepted data - will use backend APIs only
+          console.log(
+            "🔄 Owner API intercepted, owner ID:",
+            event.data.owner_id
+          );
+          this.injectFrevoUserWithBackendData(event.data.owner_id);
           break;
       }
     });
@@ -584,7 +675,7 @@ class ExtensionStateManager {
           break;
 
         case "update-pagination":
-          this.state.jobsPerPage = message.jobsPerPage;
+          this.state.jobsPerPage = message.jobsPerPage ?? 20;
           window.postMessage(
             {
               type: "UPDATE_JOBS_PER_PAGE",
@@ -626,8 +717,9 @@ class ExtensionStateManager {
 // Initialize extension
 if (
   typeof window !== "undefined" &&
-  !(window as any).__FREVO_EXTENSION_LOADED__
+  !(window as unknown as Record<string, unknown>).__FREVO_EXTENSION_LOADED__
 ) {
-  (window as any).__FREVO_EXTENSION_LOADED__ = true;
+  (window as unknown as Record<string, unknown>).__FREVO_EXTENSION_LOADED__ =
+    true;
   new ExtensionStateManager();
 }

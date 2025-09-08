@@ -1,0 +1,91 @@
+/* FrevoUser.module.css */
+
+.userContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.imageContainer {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.userImage {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+  transition: filter 0.3s ease;
+}
+
+.userImage.blurred {
+  filter: blur(4px);
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.userName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+  transition: filter 0.3s ease;
+}
+
+.userName.blurred {
+  filter: blur(2px);
+  color: #9ca3af;
+}
+
+.username {
+  font-size: 0.75rem;
+  color: #6b7280;
+  transition: filter 0.3s ease;
+}
+
+.username.blurred {
+  filter: blur(2px);
+  color: #d1d5db;
+}
+
+.eyeIcon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1.5rem;
+  height: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #6b7280;
+}
+
+.eyeIcon:hover {
+  background-color: rgba(255, 255, 255, 1);
+  color: #374151;
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.loadingSpinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #6b7280;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

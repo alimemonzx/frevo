@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { copyFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ mode }) => {
   const isContentBuild = mode === "content";
   const isAllContentBuild = mode === "all-content"; // New mode for building all content scripts
 
@@ -68,7 +68,7 @@ export default defineConfig(({ command, mode }) => {
             return {
               content: "src/content-script.tsx",
               content2: "src/content-script-2.tsx",
-            };
+            } as Record<string, string>;
           } else if (isAllContentBuild) {
             // Build multiple content scripts at once
             return {
@@ -76,9 +76,9 @@ export default defineConfig(({ command, mode }) => {
               content2: "src/content-script-2.tsx",
               // Add more content scripts here as needed
               // content3: "src/content-script-3.tsx",
-            };
+            } as Record<string, string>;
           } else {
-            return { popup: "index.html" };
+            return { popup: "index.html" } as Record<string, string>;
           }
         })(),
         output: {
@@ -87,7 +87,7 @@ export default defineConfig(({ command, mode }) => {
               return "assets/content.js";
             } else if (isAllContentBuild) {
               // Map content script names to their output files
-              const contentScriptMap = {
+              const contentScriptMap: Record<string, string> = {
                 content: "assets/content.js",
                 content2: "assets/content2.js",
                 // 'content3': 'assets/content3.js',
@@ -98,16 +98,42 @@ export default defineConfig(({ command, mode }) => {
             }
           },
           chunkFileNames: "assets/[name].js",
-          assetFileNames: "assets/[name].[ext]",
+          assetFileNames: (assetInfo) => {
+            // Handle CSS modules for extensions
+            if (assetInfo.name?.endsWith(".css")) {
+              return "assets/[name]";
+            }
+            return "assets/[name].[ext]";
+          },
           format: "es",
           name: undefined,
         },
       },
       outDir: "dist",
       emptyOutDir: !(isContentBuild || isAllContentBuild),
-      // Now using styled-components, so normal CSS handling is fine
-      cssCodeSplit: true,
+      // CSS modules support for extensions
+      cssCodeSplit: false, // Bundle CSS with JS for extensions
       minify: true,
+      // Inline CSS for content scripts to work in shadow DOM
+      ...(isContentBuild || isAllContentBuild
+        ? {
+            cssInlineLimit: 999999, // Force all CSS to be inlined
+          }
+        : {}),
+    },
+    css: {
+      modules: {
+        // Generate scoped class names for CSS modules
+        generateScopedName: "[name]__[local]___[hash:base64:5]",
+        // Enable CSS modules for .module.css files
+        localsConvention: "camelCase",
+      },
+      // For content scripts, inject CSS as JS
+      ...(isContentBuild || isAllContentBuild
+        ? {
+            preprocessorOptions: {},
+          }
+        : {}),
     },
   };
 });

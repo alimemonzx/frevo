@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import styled, { keyframes } from "styled-components";
 import { Header } from "./components/Header";
 import { StatusCard } from "./components/StatusCard";
-import { OpenAIKeyInput } from "./components/OpenAIKeyInput";
 import { InfoSection } from "./components/InfoSection";
 import { Footer } from "./components/Footer";
 import { FilterIcon, StarIcon, LoadingSpinner } from "./components/Icons";
@@ -14,6 +13,19 @@ interface User {
   email: string;
   name: string;
   picture: string;
+  package_type?: "basic" | "premium" | "pro";
+  daily_usage?: {
+    proposals: {
+      used: number;
+      limit: number;
+      remaining: number;
+    };
+    user_detail_views: {
+      used: number;
+      limit: number;
+      remaining: number;
+    };
+  };
 }
 
 // Animations
@@ -24,175 +36,185 @@ const fadeIn = keyframes`
 
 // Styled Components
 const AppContainer = styled.div`
-  background: linear-gradient(to bottom right, #eff6ff, #ffffff, #eef2ff);
-  padding: 1rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  padding: 1.5rem;
   width: 700px;
   animation: ${fadeIn} 0.3s ease-in-out;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 `;
 
 const HeaderSection = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
 `;
 
 const MainContent = styled.div`
   background-color: white;
-  border-radius: 1rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  border: 1px solid #f3f4f6;
-  padding: 1rem;
-  margin-bottom: 0.75rem;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
 `;
 
 const ContentGrid = styled.div`
-  display: flex;
-  gap: 1rem;
-`;
-
-const LeftColumn = styled.div`
-  flex: 1;
-`;
-
-const RightColumn = styled.div`
-  flex: 1;
-  border-left: 1px solid #f3f4f6;
-  padding-left: 1rem;
+  display: block;
 `;
 
 const SectionTitle = styled.h3`
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 0.75rem;
+  color: #1e293b;
+  margin-bottom: 1.25rem;
   margin-top: 0;
+  letter-spacing: -0.025em;
 `;
 
 const InputGroup = styled.div`
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 `;
 
 const InputHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 `;
 
 const Label = styled.label`
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: #475569;
   display: flex;
   align-items: center;
 `;
 
 const ResetButton = styled.button`
   font-size: 0.75rem;
-  color: #2563eb;
+  color: #3b82f6;
   font-weight: 500;
   border: none;
   background: none;
   cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease-in-out;
 
   &:hover {
     color: #1d4ed8;
+    background-color: #eff6ff;
   }
 `;
 
 const InputRow = styled.div`
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
 `;
 
 const NumberInput = styled.input`
   flex: 1;
-  padding: 0.5rem 0.75rem;
+  padding: 0.75rem;
   font-size: 0.875rem;
   border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   transition: all 0.2s ease-in-out;
+  background-color: #fafafa;
 
   &:focus {
     outline: none;
-    ring: 2px;
-    ring-color: #3b82f6;
-    border-color: transparent;
+    border-color: #3b82f6;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 `;
 
 const SaveButton = styled.button`
-  padding: 0.5rem 1rem;
-  font-size: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
   font-weight: 500;
   color: white;
-  background-color: #16a34a;
-  border-radius: 0.5rem;
-  transition: background-color 0.2s ease-in-out;
+  background-color: #10b981;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease-in-out;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
   border: none;
   cursor: pointer;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 
   &:hover {
-    background-color: #15803d;
+    background-color: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   }
 `;
 
 const HelpText = styled.p`
   font-size: 0.75rem;
-  color: #4b5563;
-  margin-top: 0.5rem;
+  color: #64748b;
+  margin-top: 0.75rem;
   margin-bottom: 0;
+  line-height: 1.4;
 `;
 
-const RatingContainer = styled.div``;
+const RatingContainer = styled.div`
+  background-color: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+`;
 
 const RatingHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
 `;
 
 const RatingLabel = styled.label`
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: #475569;
   display: flex;
   align-items: center;
 `;
 
 const RatingValue = styled.span`
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 600;
-  color: #111827;
+  color: #f59e0b;
+  background-color: #fef3c7;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
 `;
 
 const RangeInput = styled.input`
   width: 100%;
-  height: 0.5rem;
-  border-radius: 0.5rem;
+  height: 6px;
+  border-radius: 3px;
   appearance: none;
   cursor: pointer;
+  background: #e2e8f0;
 
   &::-webkit-slider-thumb {
     appearance: none;
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #fbbf24;
+    background: #f59e0b;
     cursor: pointer;
-    border: 2px solid #f59e0b;
+    border: 3px solid #ffffff;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease-in-out;
   }
 
   &::-webkit-slider-thumb:hover {
-    background: #f59e0b;
+    background: #d97706;
     transform: scale(1.1);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   }
@@ -202,35 +224,38 @@ const RangeLabels = styled.div`
   display: flex;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: #6b7280;
-  margin-top: 0.25rem;
+  color: #64748b;
+  margin-top: 0.5rem;
 `;
 
 const RatingDescription = styled.p`
   font-size: 0.75rem;
-  color: #4b5563;
-  margin-top: 0.5rem;
+  color: #64748b;
+  margin-top: 0.75rem;
   margin-bottom: 0;
+  line-height: 1.4;
 `;
 
 const DisabledMessage = styled.div`
-  padding: 1rem;
-  background-color: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  padding: 1.5rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
   text-align: center;
 `;
 
 const DisabledText = styled.p`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #64748b;
   margin: 0 0 0.5rem 0;
+  font-weight: 500;
 `;
 
 const EnableText = styled.p`
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: #94a3b8;
   margin: 0;
+  line-height: 1.4;
 `;
 
 function App() {
@@ -242,8 +267,6 @@ function App() {
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
-  const [openAIKey, setOpenAIKey] = useState<string>("");
-  const [showKey, setShowKey] = useState<boolean>(false);
   const [minStarRating, setMinStarRating] = useState<number>(0);
   const [jobsPerPage, setJobsPerPage] = useState<number>(20);
 
@@ -260,12 +283,11 @@ function App() {
 
           // Only load extension settings if user is authenticated
           if (authData.user) {
-            // Load sync settings (filter, API key, etc.)
+            // Load sync settings (filter, etc.)
             chrome.storage.sync.get(
-              ["enabled", "openAIKey", "minStarRating"],
+              ["enabled", "minStarRating"],
               (syncData) => {
                 setIsEnabled(syncData.enabled || false);
-                setOpenAIKey(syncData.openAIKey || "");
                 setMinStarRating(
                   syncData.minStarRating !== undefined
                     ? syncData.minStarRating
@@ -296,6 +318,62 @@ function App() {
 
     loadData();
   }, []);
+
+  // Listen for usage update messages from content script
+  useEffect(() => {
+    if (typeof chrome !== "undefined" && chrome.runtime) {
+      const messageListener = (message: {
+        type: string;
+        usageType?: string;
+      }) => {
+        if (message.type === "UPDATE_USAGE") {
+          // Update usage inline to avoid dependency issues
+          const updateUsageInline = async (
+            type: "profile_views" | "proposals"
+          ) => {
+            if (!user || user.package_type !== "basic") return;
+
+            try {
+              const authToken = await chrome.storage.local.get(["authToken"]);
+              if (authToken.authToken) {
+                const response = await fetch(
+                  "http://localhost:3000/api/users/profile",
+                  {
+                    method: "GET",
+                    headers: {
+                      Authorization: `Bearer ${authToken.authToken}`,
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+
+                if (response.ok) {
+                  const profileData = await response.json();
+                  const updatedUser = {
+                    ...user,
+                    daily_usage: profileData.user.daily_usage,
+                  };
+                  setUser(updatedUser);
+                  chrome.storage.sync.set({ user: updatedUser });
+                  console.log(`✅ Usage updated for ${type}`);
+                }
+              }
+            } catch (error) {
+              console.error("❌ Failed to update usage:", error);
+            }
+          };
+
+          updateUsageInline(message.usageType as "profile_views" | "proposals");
+        }
+      };
+
+      chrome.runtime.onMessage.addListener(messageListener);
+
+      return () => {
+        chrome.runtime.onMessage.removeListener(messageListener);
+      };
+    }
+  }, [user]);
 
   const toggleFilter = async () => {
     setIsTransitioning(true);
@@ -344,23 +422,13 @@ function App() {
 
   const clearAllDataAndReload = async () => {
     try {
-      // Clear extension storage but preserve OpenAI key
+      // Clear extension storage
       if (typeof chrome !== "undefined" && chrome.storage) {
-        // Preserve the OpenAI key before clearing
-        const currentOpenAIKey = await new Promise<string>((resolve) => {
-          chrome.storage.sync.get(["openAIKey"], (data) => {
-            resolve(data.openAIKey || "");
-          });
-        });
-
-        // Clear sync storage except OpenAI key
+        // Clear sync storage
         await new Promise<void>((resolve) => {
           chrome.storage.sync.clear(() => {
-            // Restore the OpenAI key
-            chrome.storage.sync.set({ openAIKey: currentOpenAIKey }, () => {
-              console.log("✅ Sync storage cleared (OpenAI key preserved)");
-              resolve();
-            });
+            console.log("✅ Sync storage cleared");
+            resolve();
           });
         });
 
@@ -372,11 +440,11 @@ function App() {
           });
         });
 
-        // Reset local state (but keep OpenAI key)
+        // Reset local state
         setIsEnabled(false);
         setMinStarRating(0);
         setJobsPerPage(20);
-        // Don't reset the OpenAI key - keep it as is
+        // Reset all state
         setIsTransitioning(false);
 
         // Send disable message to content script and reload page
@@ -441,13 +509,6 @@ function App() {
           });
         }
       });
-    }
-  };
-
-  const handleOpenAIKeyChange = (value: string) => {
-    setOpenAIKey(value);
-    if (typeof chrome !== "undefined" && chrome.storage) {
-      chrome.storage.sync.set({ openAIKey: value });
     }
   };
 
@@ -538,12 +599,43 @@ function App() {
   };
 
   // Authentication functions
-  const handleAuthSuccess = (userData: User) => {
+  const handleAuthSuccess = async (userData: User) => {
     setUser(userData);
     if (typeof chrome !== "undefined" && chrome.storage) {
       chrome.storage.sync.set({ user: userData }, () => {
         console.log("✅ User authenticated and saved");
       });
+
+      // Fetch user profile with usage data
+      try {
+        const authToken = await chrome.storage.local.get(["authToken"]);
+        if (authToken.authToken) {
+          const response = await fetch(
+            "http://localhost:3000/api/users/profile",
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${authToken.authToken}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (response.ok) {
+            const profileData = await response.json();
+            const updatedUser = {
+              ...userData,
+              package_type: profileData.user.package_type,
+              daily_usage: profileData.user.daily_usage,
+            };
+            setUser(updatedUser);
+            chrome.storage.sync.set({ user: updatedUser });
+            console.log("✅ User profile with usage data loaded");
+          }
+        }
+      } catch (error) {
+        console.error("❌ Failed to fetch user profile:", error);
+      }
     }
   };
 
@@ -562,9 +654,12 @@ function App() {
           // Get current token and remove it
           chrome.identity.getAuthToken({ interactive: false }, (token) => {
             if (token) {
-              chrome.identity.removeCachedAuthToken({ token }, () => {
-                console.log("✅ Auth token cleared");
-              });
+              chrome.identity.removeCachedAuthToken(
+                { token: token as string },
+                () => {
+                  console.log("✅ Auth token cleared");
+                }
+              );
             }
           });
         } catch (error) {
@@ -573,18 +668,8 @@ function App() {
       }
 
       if (chrome.storage) {
-        // Remove user from storage but keep OpenAI key
-        const currentOpenAIKey = await new Promise<string>((resolve) => {
-          chrome.storage.sync.get(["openAIKey"], (data) => {
-            resolve(data.openAIKey || "");
-          });
-        });
-
         chrome.storage.sync.clear(() => {
-          // Restore only the OpenAI key
-          chrome.storage.sync.set({ openAIKey: currentOpenAIKey }, () => {
-            console.log("✅ User logged out, OpenAI key preserved");
-          });
+          console.log("✅ User logged out, storage cleared");
         });
 
         // Clear local storage
@@ -660,119 +745,94 @@ function App() {
         />
       </HeaderSection>
 
-      {/* Main Content - Horizontal Layout */}
+      {/* Main Content */}
       <MainContent>
         <ContentGrid>
-          {/* Left Column - Filter Controls */}
-          <LeftColumn>
-            <SectionTitle>Filter Controls</SectionTitle>
+          <SectionTitle>Filter Controls</SectionTitle>
 
-            {/* Jobs per page input - Always visible */}
-            <InputGroup>
-              <InputHeader>
-                <Label>Jobs per page</Label>
-                <ResetButton onClick={resetPagination}>Reset to 20</ResetButton>
-              </InputHeader>
-              <InputRow>
-                <NumberInput
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={jobsPerPage}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    if (!isNaN(value) && value >= 1 && value <= 100) {
-                      setJobsPerPage(value);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    // Save and refresh on Enter key
-                    if (e.key === "Enter") {
-                      if (jobsPerPage >= 1 && jobsPerPage <= 100) {
-                        handleJobsPerPageChange(jobsPerPage);
-                      }
-                    }
-                  }}
-                  placeholder="20"
-                />
-                <SaveButton
-                  onClick={() => handleJobsPerPageChange(jobsPerPage)}
-                >
-                  <span>💾</span>
-                  Save
-                </SaveButton>
-              </InputRow>
-
-              <HelpText>
-                Click <strong>Save</strong> or press <strong>Enter</strong> to
-                apply changes and refresh the page automatically.
-              </HelpText>
-            </InputGroup>
-
-            {/* Star Rating Slider - Only show when filter is enabled */}
-            {isEnabled ? (
-              <RatingContainer>
-                <RatingHeader>
-                  <RatingLabel>
-                    <StarIcon />
-                    <span style={{ marginLeft: "0.25rem", color: "#f59e0b" }}>
-                      Min Rating
-                    </span>
-                  </RatingLabel>
-                  <RatingValue>{minStarRating.toFixed(1)}</RatingValue>
-                </RatingHeader>
-                <RangeInput
-                  type="range"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={minStarRating}
-                  onChange={(e) =>
-                    handleStarRatingChange(parseFloat(e.target.value))
+          {/* Jobs per page input - Always visible */}
+          <InputGroup>
+            <InputHeader>
+              <Label>Jobs per page</Label>
+              <ResetButton onClick={resetPagination}>Reset to 20</ResetButton>
+            </InputHeader>
+            <InputRow>
+              <NumberInput
+                type="number"
+                min="1"
+                max="100"
+                value={jobsPerPage}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  if (!isNaN(value) && value >= 1 && value <= 100) {
+                    setJobsPerPage(value);
                   }
-                  style={{
-                    background: `linear-gradient(to right, #fbbf24 0%, #fbbf24 ${
-                      (minStarRating / 5) * 100
-                    }%, #e5e7eb ${(minStarRating / 5) * 100}%, #e5e7eb 100%)`,
-                  }}
-                />
-                <RangeLabels>
-                  <span>0.0</span>
-                  <span>5.0</span>
-                </RangeLabels>
-                <RatingDescription>
-                  Show projects with {minStarRating.toFixed(1)}+ stars
-                </RatingDescription>
-              </RatingContainer>
-            ) : (
-              <DisabledMessage>
-                <DisabledText>🔒 Star Rating Filter Disabled</DisabledText>
-                <EnableText>
-                  Turn on the extension to filter projects by star rating
-                </EnableText>
-              </DisabledMessage>
-            )}
-          </LeftColumn>
-
-          {/* Right Column - AI Settings */}
-          <RightColumn>
-            <SectionTitle>AI Assistant</SectionTitle>
-            {isEnabled ? (
-              <OpenAIKeyInput
-                openAIKey={openAIKey}
-                showKey={showKey}
-                onKeyChange={handleOpenAIKeyChange}
-                onToggleShowKey={() => setShowKey(!showKey)}
+                }}
+                onKeyDown={(e) => {
+                  // Save and refresh on Enter key
+                  if (e.key === "Enter") {
+                    if (jobsPerPage >= 1 && jobsPerPage <= 100) {
+                      handleJobsPerPageChange(jobsPerPage);
+                    }
+                  }
+                }}
+                placeholder="20"
               />
-            ) : (
-              <DisabledMessage>
-                <DisabledText>🤖 AI Assistant Disabled</DisabledText>
-                <EnableText>
-                  Turn on the extension to use AI proposal generation
-                </EnableText>
-              </DisabledMessage>
-            )}
-          </RightColumn>
+              <SaveButton onClick={() => handleJobsPerPageChange(jobsPerPage)}>
+                <span>💾</span>
+                Save
+              </SaveButton>
+            </InputRow>
+
+            <HelpText>
+              Click <strong>Save</strong> or press <strong>Enter</strong> to
+              apply changes and refresh the page automatically.
+            </HelpText>
+          </InputGroup>
+
+          {/* Star Rating Slider - Only show when filter is enabled */}
+          {isEnabled ? (
+            <RatingContainer>
+              <RatingHeader>
+                <RatingLabel>
+                  <StarIcon />
+                  <span style={{ marginLeft: "0.25rem", color: "#f59e0b" }}>
+                    Min Rating
+                  </span>
+                </RatingLabel>
+                <RatingValue>{minStarRating.toFixed(1)}</RatingValue>
+              </RatingHeader>
+              <RangeInput
+                type="range"
+                min="0"
+                max="5"
+                step="0.1"
+                value={minStarRating}
+                onChange={(e) =>
+                  handleStarRatingChange(parseFloat(e.target.value))
+                }
+                style={{
+                  background: `linear-gradient(to right, #fbbf24 0%, #fbbf24 ${
+                    (minStarRating / 5) * 100
+                  }%, #e5e7eb ${(minStarRating / 5) * 100}%, #e5e7eb 100%)`,
+                }}
+              />
+              <RangeLabels>
+                <span>0.0</span>
+                <span>5.0</span>
+              </RangeLabels>
+              <RatingDescription>
+                Show projects with {minStarRating.toFixed(1)}+ stars
+              </RatingDescription>
+            </RatingContainer>
+          ) : (
+            <DisabledMessage>
+              <DisabledText>🔒 Star Rating Filter Disabled</DisabledText>
+              <EnableText>
+                Turn on the extension to filter projects by star rating
+              </EnableText>
+            </DisabledMessage>
+          )}
         </ContentGrid>
       </MainContent>
 

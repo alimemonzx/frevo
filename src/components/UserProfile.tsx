@@ -5,6 +5,19 @@ interface User {
   email: string;
   name: string;
   picture: string;
+  package_type?: "basic" | "premium" | "pro";
+  daily_usage?: {
+    proposals: {
+      used: number;
+      limit: number;
+      remaining: number;
+    };
+    user_detail_views: {
+      used: number;
+      limit: number;
+      remaining: number;
+    };
+  };
 }
 
 interface UserProfileProps {
@@ -15,13 +28,18 @@ interface UserProfileProps {
 // Styled Components
 const ProfileContainer = styled.div`
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   padding: 0.75rem;
   background-color: white;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
   margin-bottom: 1rem;
+`;
+
+const ProfileHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 `;
 
 const UserInfo = styled.div`
@@ -70,17 +88,114 @@ const LogoutButton = styled.button`
   }
 `;
 
+const UsageSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+`;
+
+const UsageItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+`;
+
+const UsageLabel = styled.span`
+  color: #6b7280;
+`;
+
+const UsageValue = styled.span`
+  color: #111827;
+  font-weight: 500;
+`;
+
+const UsageBar = styled.div`
+  width: 100%;
+  height: 4px;
+  background-color: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.25rem;
+`;
+
+const UsageProgress = styled.div<{ percentage: number; color: string }>`
+  height: 100%;
+  width: ${(props) => props.percentage}%;
+  background-color: ${(props) => props.color};
+  transition: width 0.3s ease-in-out;
+`;
+
 export const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
+  const isBasicPlan = user.package_type === "basic";
+  const dailyUsage = user.daily_usage;
+
+  const getUsageColor = (used: number, limit: number) => {
+    const percentage = (used / limit) * 100;
+    if (percentage >= 90) return "#ef4444"; // red
+    if (percentage >= 70) return "#f59e0b"; // yellow
+    return "#10b981"; // green
+  };
+
   return (
     <ProfileContainer>
-      <UserInfo>
-        <UserAvatar src={user.picture} alt={user.name} />
-        <UserDetails>
-          <UserName>{user.name}</UserName>
-          <UserEmail>{user.email}</UserEmail>
-        </UserDetails>
-      </UserInfo>
-      <LogoutButton onClick={onLogout}>Sign out</LogoutButton>
+      <ProfileHeader>
+        <UserInfo>
+          <UserAvatar src={user.picture} alt={user.name} />
+          <UserDetails>
+            <UserName>{user.name}</UserName>
+            <UserEmail>{user.email}</UserEmail>
+          </UserDetails>
+        </UserInfo>
+        <LogoutButton onClick={onLogout}>Sign out</LogoutButton>
+      </ProfileHeader>
+
+      {isBasicPlan && dailyUsage && (
+        <UsageSection>
+          <UsageItem>
+            <UsageLabel>Profile Views</UsageLabel>
+            <UsageValue>
+              {dailyUsage.user_detail_views.remaining} /{" "}
+              {dailyUsage.user_detail_views.limit} left
+            </UsageValue>
+          </UsageItem>
+          <UsageBar>
+            <UsageProgress
+              percentage={
+                (dailyUsage.user_detail_views.used /
+                  dailyUsage.user_detail_views.limit) *
+                100
+              }
+              color={getUsageColor(
+                dailyUsage.user_detail_views.used,
+                dailyUsage.user_detail_views.limit
+              )}
+            />
+          </UsageBar>
+
+          <UsageItem>
+            <UsageLabel>Proposals</UsageLabel>
+            <UsageValue>
+              {dailyUsage.proposals.remaining} / {dailyUsage.proposals.limit}{" "}
+              left
+            </UsageValue>
+          </UsageItem>
+          <UsageBar>
+            <UsageProgress
+              percentage={
+                (dailyUsage.proposals.used / dailyUsage.proposals.limit) * 100
+              }
+              color={getUsageColor(
+                dailyUsage.proposals.used,
+                dailyUsage.proposals.limit
+              )}
+            />
+          </UsageBar>
+        </UsageSection>
+      )}
     </ProfileContainer>
   );
 };

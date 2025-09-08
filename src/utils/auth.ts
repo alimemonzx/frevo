@@ -10,6 +10,47 @@ export interface User {
   usageCount?: number;
 }
 
+export interface UserProfile {
+  id: number;
+  google_id: string;
+  email: string;
+  name: string;
+  picture: string;
+  package_type: "basic" | "premium" | "pro";
+  subscription_status: "active" | "inactive" | "cancelled";
+  created_at: string;
+  updated_at: string;
+  daily_usage: {
+    proposals: {
+      used: number;
+      limit: number;
+      remaining: number;
+    };
+    user_detail_views: {
+      used: number;
+      limit: number;
+      remaining: number;
+    };
+  };
+}
+
+export interface JobOwnerDetails {
+  avatar: string;
+  public_name: string;
+  username: string;
+  owner_id: string;
+}
+
+export interface JobOwnerResponse {
+  success: boolean;
+  job_owner: JobOwnerDetails;
+  usage: {
+    used: number;
+    limit: number;
+    remaining: number;
+  };
+}
+
 export interface AuthData {
   authToken: string;
   user: User;
@@ -136,7 +177,8 @@ export const makeAuthenticatedRequest = async (
  */
 export const API_ENDPOINTS = {
   GOOGLE_SIGNIN: "http://localhost:3000/api/auth/google-signin",
-  USER_PROFILE: "http://localhost:3000/api/user/profile",
+  USER_PROFILE: "http://localhost:3000/api/users/profile",
+  JOB_OWNER_DETAILS: "http://localhost:3000/api/users/job-owner-details",
   USAGE_STATS: "http://localhost:3000/api/user/usage",
 } as const;
 
@@ -176,6 +218,74 @@ export const authenticateWithBackend = async (
     };
   } catch (error) {
     console.error("❌ Backend authentication error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch user profile from backend
+ */
+export const fetchUserProfile = async (): Promise<{
+  success: boolean;
+  user: UserProfile;
+}> => {
+  try {
+    console.log("🔄 Fetching user profile...");
+
+    const response = await makeAuthenticatedRequest(
+      API_ENDPOINTS.USER_PROFILE,
+      {
+        method: "GET",
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to fetch user profile: ${response.status} - ${errorText}`
+      );
+    }
+
+    const result = await response.json();
+    console.log("✅ User profile fetched successfully");
+
+    return result;
+  } catch (error) {
+    console.error("❌ Error fetching user profile:", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch job owner details from backend
+ */
+export const fetchJobOwnerDetails = async (
+  ownerId: string
+): Promise<JobOwnerResponse> => {
+  try {
+    console.log("🔄 Fetching job owner details for ownerId:", ownerId);
+
+    const response = await makeAuthenticatedRequest(
+      API_ENDPOINTS.JOB_OWNER_DETAILS,
+      {
+        method: "POST",
+        body: JSON.stringify({ ownerId }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to fetch job owner details: ${response.status} - ${errorText}`
+      );
+    }
+
+    const result = await response.json();
+    console.log("✅ Job owner details fetched successfully");
+
+    return result;
+  } catch (error) {
+    console.error("❌ Error fetching job owner details:", error);
     throw error;
   }
 };

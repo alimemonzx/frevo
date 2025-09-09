@@ -278,6 +278,10 @@ function App() {
         chrome.storage.sync.get(["user"], (authData) => {
           if (authData.user) {
             setUser(authData.user);
+            console.log(
+              "✅ User data loaded from sync storage:",
+              authData.user
+            );
           }
           setIsAuthLoading(false);
 
@@ -319,61 +323,28 @@ function App() {
     loadData();
   }, []);
 
-  // Listen for usage update messages from content script
+  // Listen for storage changes to update user data when sync storage is updated
   useEffect(() => {
-    if (typeof chrome !== "undefined" && chrome.runtime) {
-      const messageListener = (message: {
-        type: string;
-        usageType?: string;
+    if (typeof chrome !== "undefined" && chrome.storage) {
+      const storageListener = (changes: {
+        [key: string]: chrome.storage.StorageChange;
       }) => {
-        if (message.type === "UPDATE_USAGE") {
-          // Update usage inline to avoid dependency issues
-          const updateUsageInline = async (
-            type: "profile_views" | "proposals"
-          ) => {
-            if (!user || user.package_type !== "basic") return;
-
-            try {
-              const authToken = await chrome.storage.local.get(["authToken"]);
-              if (authToken.authToken) {
-                const response = await fetch(
-                  "http://localhost:3000/api/users/profile",
-                  {
-                    method: "GET",
-                    headers: {
-                      Authorization: `Bearer ${authToken.authToken}`,
-                      "Content-Type": "application/json",
-                    },
-                  }
-                );
-
-                if (response.ok) {
-                  const profileData = await response.json();
-                  const updatedUser = {
-                    ...user,
-                    daily_usage: profileData.user.daily_usage,
-                  };
-                  setUser(updatedUser);
-                  chrome.storage.sync.set({ user: updatedUser });
-                  console.log(`✅ Usage updated for ${type}`);
-                }
-              }
-            } catch (error) {
-              console.error("❌ Failed to update usage:", error);
-            }
-          };
-
-          updateUsageInline(message.usageType as "profile_views" | "proposals");
+        if (changes.user && changes.user.newValue) {
+          console.log(
+            "📨 User data updated in sync storage:",
+            changes.user.newValue
+          );
+          setUser(changes.user.newValue);
         }
       };
 
-      chrome.runtime.onMessage.addListener(messageListener);
+      chrome.storage.onChanged.addListener(storageListener);
 
       return () => {
-        chrome.runtime.onMessage.removeListener(messageListener);
+        chrome.storage.onChanged.removeListener(storageListener);
       };
     }
-  }, [user]);
+  }, []);
 
   const toggleFilter = async () => {
     setIsTransitioning(true);

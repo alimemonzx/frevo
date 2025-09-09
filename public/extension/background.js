@@ -57,6 +57,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 
+  // Handle jobs view event from content script
+  if (message.type === "JOBS_VIEW_EVENT") {
+    // Get current user data from sync storage
+    chrome.storage.sync.get(["user"], (result) => {
+      if (chrome.runtime.lastError) {
+        console.error("❌ Error getting user data:", chrome.runtime.lastError);
+        sendResponse({
+          success: false,
+          error: chrome.runtime.lastError.message,
+        });
+        return;
+      }
+
+      if (result.user) {
+        console.log("👁️ User data found:", result.user);
+        console.log("👁️ Message data found:", message.data);
+        // Update the user's usage data in sync storage
+        const updatedUser = {
+          ...result.user,
+          daily_usage: {
+            ...result.user.daily_usage,
+            [message.data.usageType]: message.data.usage,
+          },
+        };
+
+        // Store updated user data back to sync storage
+        chrome.storage.sync.set({ user: updatedUser }, () => {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "❌ Error updating user usage in sync storage:",
+              chrome.runtime.lastError
+            );
+            sendResponse({
+              success: false,
+              error: chrome.runtime.lastError.message,
+            });
+          } else {
+            console.log("✅ User usage updated in sync storage successfully");
+            sendResponse({ success: true });
+          }
+        });
+      } else {
+        console.log("❌ No user data found in sync storage");
+        sendResponse({ success: false, error: "No user data found" });
+      }
+    });
+
+    return true; // Keep message channel open for async response
+  }
+
   // Default response for unknown message types
   sendResponse({ success: false, error: "Unknown message type" });
 });

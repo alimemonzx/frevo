@@ -1,12 +1,7 @@
 import { createRoot, type Root } from "react-dom/client";
 import { FrevoAIButton } from "./components/FrevoAiButton/FrevoAIButton";
 import FrevoUser from "./components/FrevoUser/FrevoUser";
-import {
-  fetchUserProfile,
-  fetchJobOwnerDetails,
-  getAuthToken,
-  type UserProfile,
-} from "./utils/auth";
+import { fetchUserProfile, getAuthToken, type UserProfile } from "./utils/auth";
 
 // Using CSS modules for extension-compatible styling!
 
@@ -15,13 +10,16 @@ interface ExtensionState {
   minStarRating: number;
   jobsPerPage: number;
   frevoButtonInjected: boolean;
+  frevoUserInjected: boolean;
   projectDescription: string;
   currentUrl: string;
   observer: MutationObserver | null;
   scriptInjected: boolean;
   isInitializing: boolean;
   reactRoot: Root | null;
+  userReactRoot: Root | null;
   shadowRoot: ShadowRoot | null;
+  userShadowRoot: ShadowRoot | null;
   userProfile: UserProfile | null;
   isUserProfileLoading: boolean;
 }
@@ -32,13 +30,16 @@ class ExtensionStateManager {
     minStarRating: 0,
     jobsPerPage: 20,
     frevoButtonInjected: false,
+    frevoUserInjected: false,
     projectDescription: "",
     currentUrl: window.location.href,
     observer: null,
     scriptInjected: false,
     isInitializing: false,
     reactRoot: null,
+    userReactRoot: null,
     shadowRoot: null,
+    userShadowRoot: null,
     userProfile: null,
     isUserProfileLoading: false,
   };
@@ -60,6 +61,13 @@ class ExtensionStateManager {
   private async start() {
     try {
       await this.loadStorageData();
+
+      // Check if extension is enabled before proceeding
+      if (!this.state.filterEnabled) {
+        console.log("🔒 Extension is disabled, skipping initialization");
+        return;
+      }
+
       await this.loadUserProfile();
       this.setupEventListeners();
       this.setupUrlChangeDetection();
@@ -306,6 +314,147 @@ class ExtensionStateManager {
     }
   }
 
+  // 🔍 POLL FOR ELEMENT AND INJECT WHEN FOUND
+  private pollForElementAndInject(ownerId: string): void {
+    console.log("🔄 Starting polling for ProjectDetailsCard-title element...");
+
+    const startTime = Date.now();
+    const maxDuration = 20000; // 20 seconds
+    const pollInterval = 250; // Check every 250ms
+
+    const poll = () => {
+      // Check if we've exceeded the time limit
+      if (Date.now() - startTime > maxDuration) {
+        console.log(
+          "❌ Polling timeout: ProjectDetailsCard-title not found after 20 seconds"
+        );
+        return;
+      }
+
+      // Check if already injected
+      if (this.state.frevoUserInjected) {
+        console.log("✅ FrevoUser already injected, stopping poll");
+        return;
+      }
+
+      // Try to find the element
+      const element = this.findProjectTitleElement();
+      if (element) {
+        console.log("✅ Element found! Injecting FrevoUser...");
+        this.injectFrevoUserWithElement(ownerId, element);
+        return;
+      }
+
+      // Continue polling
+      setTimeout(poll, pollInterval);
+    };
+
+    // Start polling
+    poll();
+  }
+
+  // 🔍 FIND PROJECT TITLE ELEMENT WITH MULTIPLE SELECTORS
+  private findProjectTitleElement(): Element | null {
+    const selectors = [
+      ".ProjectDetailsCard-title.ng-star-inserted",
+      ".ProjectDetailsCard-title",
+      "[class*='ProjectDetailsCard-title']",
+      "[class*='project-title']",
+      "[class*='ProjectTitle']",
+    ];
+
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        console.log(`✅ Found project title with selector: ${selector}`);
+        return element;
+      }
+    }
+
+    return null;
+  }
+
+  // // 🚀 INJECT FREVO USER COMPONENT WITH OWNER ID (LEGACY - FOR DIRECT CALLS)
+  // private async injectFrevoUser(ownerId: string): Promise<void> {
+  //   const element = this.findProjectTitleElement();
+  //   if (!element) {
+  //     console.log("❌ ProjectDetailsCard-title not found");
+  //     return;
+  //   }
+
+  //   this.injectFrevoUserWithElement(ownerId, element);
+  // }
+
+  // 🚀 INJECT FREVO USER COMPONENT WITH OWNER ID AND ELEMENT
+  private async injectFrevoUserWithElement(
+    ownerId: string,
+    projectTitle: Element
+  ): Promise<void> {
+    if (this.state.frevoUserInjected) return;
+
+    console.log("✅ Injecting FrevoUser component with shadow DOM");
+
+    try {
+      // Create container element similar to FrevoButton
+      const container = document.createElement("div");
+      container.setAttribute("data-frevo-user", "true");
+      container.style.cssText = "display: block; margin-top: 10px;";
+
+      // Create shadow DOM for isolation
+      const shadowRoot = container.attachShadow({ mode: "open" });
+      this.state.userShadowRoot = shadowRoot;
+
+      // Create mount point inside shadow DOM
+      const mountPoint = document.createElement("div");
+      mountPoint.id = "frevo-user-root";
+
+      // Add styles to shadow DOM
+      const style = document.createElement("style");
+      style.textContent = `
+        :host {
+          all: initial;
+          display: block;
+        }
+        * {
+          box-sizing: border-box;
+        }
+        #frevo-user-root {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+      `;
+
+      // Inject CSS modules styles into shadow DOM
+      this.injectCSSModules(shadowRoot);
+
+      // Add styles and mount point to shadow DOM
+      shadowRoot.appendChild(style);
+      shadowRoot.appendChild(mountPoint);
+
+      // Create React root inside shadow DOM
+      const root = createRoot(mountPoint);
+      this.state.userReactRoot = root;
+
+      // Render FrevoUser component with the provided owner ID
+      root.render(
+        <FrevoUser
+          packageType={this.state.userProfile?.package_type}
+          ownerId={ownerId}
+        />
+      );
+
+      // Insert right after the ProjectDetailsCard-title element
+      projectTitle.insertAdjacentElement("afterend", container);
+
+      this.state.frevoUserInjected = true;
+      console.log(
+        "✅ FrevoUser component injected successfully with shadow DOM"
+      );
+    } catch (error) {
+      console.error("❌ Failed to inject FrevoUser component:", error);
+      this.cleanupFrevoUser();
+    }
+  }
+
   private async cleanupFrevoButton(): Promise<void> {
     try {
       // Cleanup React root
@@ -343,6 +492,30 @@ class ExtensionStateManager {
       this.state.shadowRoot = null;
     } catch (error) {
       console.error("❌ Error during cleanup:", error);
+    }
+  }
+
+  private async cleanupFrevoUser(): Promise<void> {
+    try {
+      // Cleanup React root (same pattern as FrevoButton)
+      if (this.state.userReactRoot) {
+        this.state.userReactRoot.unmount();
+        this.state.userReactRoot = null;
+      }
+
+      // Remove Shadow DOM container (same pattern as FrevoButton)
+      const existingUser = document.querySelector('[data-frevo-user="true"]');
+      if (existingUser) {
+        existingUser.remove();
+      }
+
+      // Reset state
+      this.state.frevoUserInjected = false;
+      this.state.userShadowRoot = null;
+
+      console.log("✅ FrevoUser component cleaned up");
+    } catch (error) {
+      console.error("❌ Error cleaning up FrevoUser:", error);
     }
   }
 
@@ -385,6 +558,7 @@ class ExtensionStateManager {
     if (newUrl !== this.state.currentUrl) {
       this.state.currentUrl = newUrl;
       this.cleanupFrevoButton();
+      this.cleanupFrevoUser();
 
       if (this.isDetailPage()) {
         setTimeout(() => this.initializeFrevo(), 500);
@@ -397,9 +571,10 @@ class ExtensionStateManager {
   }
 
   private setupUrlChangeDetection(): void {
+    // Reduce interval for faster SPA navigation detection
     this.urlCheckInterval = window.setInterval(
       () => this.checkUrlChange(),
-      2000
+      500 // More frequent checking for better SPA support
     ) as number;
 
     const originalPushState = history.pushState;
@@ -418,6 +593,16 @@ class ExtensionStateManager {
     window.addEventListener("popstate", () => {
       setTimeout(() => this.checkUrlChange(), 100);
     });
+
+    // Add additional navigation event listeners for better SPA support
+    window.addEventListener("hashchange", () => {
+      setTimeout(() => this.checkUrlChange(), 100);
+    });
+
+    // Listen for Angular router navigation events (freelancer.com uses Angular)
+    window.addEventListener("locationchange", () => {
+      setTimeout(() => this.checkUrlChange(), 100);
+    });
   }
 
   private async initializeFrevo(): Promise<void> {
@@ -434,6 +619,7 @@ class ExtensionStateManager {
     try {
       await this.extractProjectDescription();
       await this.injectFrevoButton();
+      // FrevoUser will be injected when OWNER_API_INTERCEPTED event is received
       this.setupDOMObserver();
     } catch (error) {
       console.error("❌ Failed to initialize Frevo:", error);
@@ -449,12 +635,14 @@ class ExtensionStateManager {
       if (debounceTimer) clearTimeout(debounceTimer);
 
       debounceTimer = window.setTimeout(() => {
+        // Handle FrevoButton injection (same as before)
         if (!this.state.frevoButtonInjected) {
           this.injectFrevoButton();
         }
         if (!this.state.projectDescription) {
           this.extractProjectDescription();
         }
+        // FrevoUser is only injected when OWNER_API_INTERCEPTED event is received
       }, 250) as number;
     });
 
@@ -484,93 +672,6 @@ class ExtensionStateManager {
 
     (document.head || document.documentElement).appendChild(script);
     this.state.scriptInjected = true;
-  }
-
-  private async injectFrevoUserWithBackendData(ownerId?: string) {
-    // Look for the ProjectDetailsCard-title element
-    const projectTitle = document.querySelector(
-      ".ProjectDetailsCard-title.ng-star-inserted"
-    );
-
-    if (!projectTitle || projectTitle.querySelector("#extension-analyzer")) {
-      return;
-    }
-
-    const container = document.createElement("div");
-    container.id = "extension-analyzer";
-
-    // 🎯 CREATE SHADOW DOM WITH PROPER STYLING
-    const shadowRoot = container.attachShadow({ mode: "open" });
-
-    // 🔥 CSS FOR SHADOW DOM - Including CSS modules and base styles!
-    const style = document.createElement("style");
-    style.textContent = `
-    /* Reset and base styles for shadow DOM */
-    :host {
-      all: initial;
-      display: block;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    /* Additional styles for FrevoUser component */
-    #frevo-user-root {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-  `;
-
-    // Inject CSS modules styles into shadow DOM
-    this.injectCSSModules(shadowRoot);
-
-    // Create mount point inside shadow DOM
-    const mountPoint = document.createElement("div");
-    mountPoint.id = "frevo-user-root";
-
-    // Add styles and mount point to shadow DOM
-    shadowRoot.appendChild(style);
-    shadowRoot.appendChild(mountPoint);
-
-    // Create React root inside shadow DOM with styles
-    const root = createRoot(mountPoint);
-
-    // Handle job owner details fetching
-    const handleViewDetails = async () => {
-      if (!ownerId) {
-        throw new Error("Owner ID not available");
-      }
-
-      try {
-        const jobOwnerResponse = await fetchJobOwnerDetails(ownerId);
-        console.log("✅ Job owner details fetched:", jobOwnerResponse);
-
-        // Update usage in the extension popup
-        chrome.runtime.sendMessage({
-          type: "UPDATE_USAGE",
-          usageType: "profile_views",
-        });
-
-        return jobOwnerResponse;
-      } catch (error) {
-        console.error("❌ Failed to fetch job owner details:", error);
-        throw error;
-      }
-    };
-
-    // Use placeholder data initially - real data will be fetched when eye icon is clicked
-    root.render(
-      <FrevoUser
-        image={chrome.runtime.getURL("avatar.jpg")}
-        name="Loading..."
-        username="loading"
-        packageType={this.state.userProfile?.package_type}
-        onViewDetails={handleViewDetails}
-      />
-    );
-
-    // Insert right after the ProjectDetailsCard-title element
-    projectTitle.insertAdjacentElement("afterend", container);
   }
 
   private setupEventListeners(): void {
@@ -607,12 +708,19 @@ class ExtensionStateManager {
           );
           break;
         case "OWNER_API_INTERCEPTED":
-          // No longer using intercepted data - will use backend APIs only
           console.log(
             "🔄 Owner API intercepted, owner ID:",
             event.data.owner_id
           );
-          this.injectFrevoUserWithBackendData(event.data.owner_id);
+          // Start polling for element and inject when found
+          if (this.isDetailPage() && !this.state.frevoUserInjected) {
+            this.pollForElementAndInject(event.data.owner_id);
+          }
+          break;
+        case "SPA_NAVIGATION":
+          // Handle SPA navigation events from injected script
+          console.log("🚀 SPA navigation detected");
+          setTimeout(() => this.checkUrlChange(), 100);
           break;
       }
     });
@@ -623,6 +731,35 @@ class ExtensionStateManager {
     });
 
     window.addEventListener("beforeunload", () => this.cleanup());
+
+    // Add additional event listeners for better SPA support
+    // Listen for Angular router events if available
+    if (typeof window !== "undefined") {
+      // Try to hook into Angular router if it exists
+      const checkForAngularRouter = () => {
+        try {
+          // Check if Angular is available
+          const windowAny = window as unknown as Record<string, unknown>;
+          if (windowAny.ng && (windowAny.ng as Record<string, unknown>).probe) {
+            console.log("🔍 Angular detected, setting up router hooks");
+            // Set up a more aggressive polling for navigation changes
+            setInterval(() => {
+              const currentUrl = window.location.href;
+              if (currentUrl !== this.state.currentUrl) {
+                console.log("🚀 Angular navigation detected via polling");
+                this.checkUrlChange();
+              }
+            }, 100); // Very frequent checking
+          }
+        } catch {
+          // Angular not available or error accessing it
+          console.log("ℹ️ Angular router hooks not available");
+        }
+      };
+
+      // Check for Angular after DOM is loaded
+      setTimeout(checkForAngularRouter, 1000);
+    }
   }
 
   private async handleExtensionMessage(
@@ -641,9 +778,13 @@ class ExtensionStateManager {
 
         case "disable":
           this.state.filterEnabled = false;
+          // Clean up all injected components
+          await this.cleanupFrevoButton();
+          await this.cleanupFrevoUser();
           if (this.isSearchPage()) {
             await this.restoreAllProjects();
           }
+          console.log("🔒 Extension disabled - all features turned off");
           break;
 
         case "disable-and-reload":
@@ -655,6 +796,7 @@ class ExtensionStateManager {
 
           // Cleanup any injected components
           await this.cleanupFrevoButton();
+          await this.cleanupFrevoUser();
 
           // Restore all projects if on search page
           if (this.isSearchPage()) {
@@ -708,8 +850,10 @@ class ExtensionStateManager {
 
   private cleanup(): void {
     this.cleanupFrevoButton();
+    this.cleanupFrevoUser();
     if (this.urlCheckInterval) {
       clearInterval(this.urlCheckInterval);
+      this.urlCheckInterval = null;
     }
   }
 }

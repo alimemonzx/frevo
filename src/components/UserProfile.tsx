@@ -135,9 +135,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
 
   const getUsageColor = (used: number, limit: number) => {
     const percentage = (used / limit) * 100;
-    if (percentage >= 90) return "#ef4444"; // red
-    if (percentage >= 70) return "#f59e0b"; // yellow
-    return "#10b981"; // green
+    if (percentage >= 90) return "#ef4444";
+    if (percentage >= 70) return "#f59e0b";
+    return "#10b981";
   };
 
   return (

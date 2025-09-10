@@ -54,6 +54,7 @@
               "📊 Freelancer XHR Response:",
               responseData.result.projects[0].owner_id
             );
+
             window.postMessage(
               {
                 type: "OWNER_API_INTERCEPTED",

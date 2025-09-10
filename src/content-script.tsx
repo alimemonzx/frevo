@@ -315,7 +315,7 @@ class ExtensionStateManager {
   }
 
   // 🔍 POLL FOR ELEMENT AND INJECT WHEN FOUND
-  private pollForElementAndInject(ownerId: string): void {
+  private pollForElementAndInject(): void {
     console.log("🔄 Starting polling for ProjectDetailsCard-title element...");
 
     const startTime = Date.now();
@@ -341,7 +341,7 @@ class ExtensionStateManager {
       const element = this.findProjectTitleElement();
       if (element) {
         console.log("✅ Element found! Injecting FrevoUser...");
-        this.injectFrevoUserWithElement(ownerId, element);
+        this.injectFrevoUserWithElement(element);
         return;
       }
 
@@ -374,20 +374,7 @@ class ExtensionStateManager {
     return null;
   }
 
-  // // 🚀 INJECT FREVO USER COMPONENT WITH OWNER ID (LEGACY - FOR DIRECT CALLS)
-  // private async injectFrevoUser(ownerId: string): Promise<void> {
-  //   const element = this.findProjectTitleElement();
-  //   if (!element) {
-  //     console.log("❌ ProjectDetailsCard-title not found");
-  //     return;
-  //   }
-
-  //   this.injectFrevoUserWithElement(ownerId, element);
-  // }
-
-  // 🚀 INJECT FREVO USER COMPONENT WITH OWNER ID AND ELEMENT
   private async injectFrevoUserWithElement(
-    ownerId: string,
     projectTitle: Element
   ): Promise<void> {
     if (this.state.frevoUserInjected) return;
@@ -434,12 +421,9 @@ class ExtensionStateManager {
       const root = createRoot(mountPoint);
       this.state.userReactRoot = root;
 
-      // Render FrevoUser component with the provided owner ID
+      // Render FrevoUser component without ownerId (will be retrieved from storage when needed)
       root.render(
-        <FrevoUser
-          packageType={this.state.userProfile?.package_type}
-          ownerId={ownerId}
-        />
+        <FrevoUser packageType={this.state.userProfile?.package_type} />
       );
 
       // Insert right after the ProjectDetailsCard-title element
@@ -619,7 +603,8 @@ class ExtensionStateManager {
     try {
       await this.extractProjectDescription();
       await this.injectFrevoButton();
-      // FrevoUser will be injected when OWNER_API_INTERCEPTED event is received
+      // Inject FrevoUser immediately - it will get ownerId from storage when needed
+      this.pollForElementAndInject();
       this.setupDOMObserver();
     } catch (error) {
       console.error("❌ Failed to initialize Frevo:", error);
@@ -642,7 +627,10 @@ class ExtensionStateManager {
         if (!this.state.projectDescription) {
           this.extractProjectDescription();
         }
-        // FrevoUser is only injected when OWNER_API_INTERCEPTED event is received
+        // Handle FrevoUser injection if not already injected
+        if (!this.state.frevoUserInjected) {
+          this.pollForElementAndInject();
+        }
       }, 250) as number;
     });
 
@@ -712,10 +700,11 @@ class ExtensionStateManager {
             "🔄 Owner API intercepted, owner ID:",
             event.data.owner_id
           );
-          // Start polling for element and inject when found
-          if (this.isDetailPage() && !this.state.frevoUserInjected) {
-            this.pollForElementAndInject(event.data.owner_id);
-          }
+          // Forward owner ID to background script for storage
+          chrome.runtime.sendMessage({
+            type: "STORE_OWNER_ID",
+            ownerId: event.data.owner_id,
+          });
           break;
         case "SPA_NAVIGATION":
           // Handle SPA navigation events from injected script

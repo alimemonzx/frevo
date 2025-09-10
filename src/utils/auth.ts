@@ -43,12 +43,16 @@ export interface JobOwnerDetails {
 
 export interface JobOwnerResponse {
   success: boolean;
-  job_owner: JobOwnerDetails;
-  usage: {
+  job_owner?: JobOwnerDetails;
+  usage?: {
     used: number;
     limit: number;
     remaining: number;
   };
+  // Error response fields
+  error?: string;
+  message?: string;
+  limit?: number;
 }
 
 export interface AuthData {
@@ -275,6 +279,38 @@ export const fetchJobOwnerDetails = async (
 
     if (!response.ok) {
       const errorText = await response.text();
+
+      // Handle 429 (rate limit) responses specially
+      if (response.status === 429) {
+        try {
+          const errorData = JSON.parse(errorText);
+          return {
+            success: false,
+            error: errorData.error,
+            message: errorData.message,
+            limit: errorData.limit,
+            usage:
+              typeof errorData.usage === "number"
+                ? {
+                    used: errorData.usage,
+                    limit: errorData.limit,
+                    remaining: 0,
+                  }
+                : errorData.usage,
+          };
+        } catch {
+          // If JSON parsing fails, return a generic error
+          return {
+            success: false,
+            error: "Rate limit exceeded",
+            message:
+              "You have reached your daily limit. Please try again later or upgrade your plan.",
+            limit: 20,
+            usage: { used: 20, limit: 20, remaining: 0 },
+          };
+        }
+      }
+
       throw new Error(
         `Failed to fetch job owner details: ${response.status} - ${errorText}`
       );

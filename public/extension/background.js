@@ -57,6 +57,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 
+  // Handle owner ID storage from interceptor
+  if (message.type === "STORE_OWNER_ID") {
+    chrome.storage.local.set({ currentOwnerId: message.ownerId }, () => {
+      if (chrome.runtime.lastError) {
+        console.error("❌ Error storing owner ID:", chrome.runtime.lastError);
+        sendResponse({
+          success: false,
+          error: chrome.runtime.lastError.message,
+        });
+      } else {
+        console.log(`✅ Owner ID stored: ${message.ownerId}`);
+        sendResponse({ success: true });
+      }
+    });
+
+    return true; // Keep message channel open for async response
+  }
+
   // Handle jobs view event from content script
   if (message.type === "JOBS_VIEW_EVENT") {
     // Get current user data from sync storage
@@ -105,6 +123,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
 
     return true; // Keep message channel open for async response
+  }
+
+  // Handle upgrade page request
+  if (message.type === "OPEN_UPGRADE_PAGE") {
+    // Open the extension popup or redirect to upgrade page
+    chrome.tabs.create({
+      url: chrome.runtime.getURL("index.html") + "#/upgrade",
+    });
+    sendResponse({ success: true });
+    return true;
   }
 
   // Default response for unknown message types

@@ -7,6 +7,7 @@ import { Footer } from "./components/Footer";
 import { FilterIcon, StarIcon, LoadingSpinner } from "./components/Icons";
 import GoogleAuth from "./components/GoogleAuth";
 import UserProfile from "./components/UserProfile";
+import { API_ENDPOINTS } from "./utils/config";
 
 // User type
 interface User {
@@ -393,8 +394,32 @@ function App() {
 
   const clearAllDataAndReload = async () => {
     try {
-      // Clear extension storage
+      // Clear extension storage (but preserve user authentication data)
       if (typeof chrome !== "undefined" && chrome.storage) {
+        // Get current user data to preserve it
+        const currentUserData = await new Promise<User | null>((resolve) => {
+          chrome.storage.sync.get(["user"], (result) => {
+            resolve(result.user || null);
+          });
+        });
+
+        const currentAuthData = await new Promise<{
+          authToken: string | null;
+          user: User | null;
+          lastAuthTime: number | null;
+        }>((resolve) => {
+          chrome.storage.local.get(
+            ["authToken", "user", "lastAuthTime"],
+            (result) => {
+              resolve({
+                authToken: result.authToken || null,
+                user: result.user || null,
+                lastAuthTime: result.lastAuthTime || null,
+              });
+            }
+          );
+        });
+
         // Clear sync storage
         await new Promise<void>((resolve) => {
           chrome.storage.sync.clear(() => {
@@ -410,6 +435,36 @@ function App() {
             resolve();
           });
         });
+
+        // Restore user authentication data
+        if (currentUserData) {
+          await new Promise<void>((resolve) => {
+            chrome.storage.sync.set({ user: currentUserData }, () => {
+              console.log("✅ User data restored in sync storage");
+              resolve();
+            });
+          });
+        }
+
+        if (
+          currentAuthData.authToken &&
+          currentAuthData.user &&
+          currentAuthData.lastAuthTime
+        ) {
+          await new Promise<void>((resolve) => {
+            chrome.storage.local.set(
+              {
+                authToken: currentAuthData.authToken,
+                user: currentAuthData.user,
+                lastAuthTime: currentAuthData.lastAuthTime,
+              },
+              () => {
+                console.log("✅ Auth data restored in local storage");
+                resolve();
+              }
+            );
+          });
+        }
 
         // Reset local state
         setIsEnabled(false);
@@ -581,16 +636,13 @@ function App() {
       try {
         const authToken = await chrome.storage.local.get(["authToken"]);
         if (authToken.authToken) {
-          const response = await fetch(
-            "http://localhost:3000/api/users/profile",
-            {
-              method: "GET",
-              headers: {
-                Authorization: `Bearer ${authToken.authToken}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
+          const response = await fetch(API_ENDPOINTS.USER_PROFILE, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${authToken.authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
 
           if (response.ok) {
             const profileData = await response.json();

@@ -1,14 +1,23 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { copyFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
 export default defineConfig(({ mode }) => {
+  // Load environment variables
+  const env = loadEnv(mode, process.cwd(), "");
   const isContentBuild = mode === "content";
   const isAllContentBuild = mode === "all-content"; // New mode for building all content scripts
 
   return {
     base: "./",
+    define: {
+      // Make environment variables available to the client
+      "import.meta.env.VITE_API_BASE_URL": JSON.stringify(
+        env.VITE_API_BASE_URL
+      ),
+      "import.meta.env.VITE_APP_ENV": JSON.stringify(env.VITE_APP_ENV || mode),
+    },
     plugins: [
       react(),
       {

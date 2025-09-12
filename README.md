@@ -83,6 +83,44 @@ A Chrome extension that enhances your Freelancer.com experience by filtering pro
 
 ## Development
 
+### Environment Configuration
+
+The extension supports different environments for development and production:
+
+#### Environment Files
+
+- `.env.development` - Development environment (uses `http://localhost:3000`)
+- `.env.production` - Production environment (uses `https://frevo.app`)
+- `.env` - Default fallback environment
+
+#### Environment Variables
+
+- `VITE_API_BASE_URL` - Base URL for API endpoints
+- `VITE_APP_ENV` - Current environment (development/production)
+
+#### Development Commands
+
+```bash
+# Development mode (uses localhost:3000)
+npm run dev
+
+# Production mode (uses frevo.app)
+npm run dev:prod
+
+# Build for development
+npm run build:dev
+
+# Build for production
+npm run build
+```
+
+#### Switching Environments
+
+1. **For Development**: Use `npm run dev` or `npm run build:dev`
+2. **For Production**: Use `npm run dev:prod` or `npm run build`
+
+The extension will automatically use the correct API endpoints based on the environment.
+
 ### Project Structure
 
 ```

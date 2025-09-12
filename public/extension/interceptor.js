@@ -50,15 +50,26 @@
         if (this.readyState === 4 && this.status === 200) {
           try {
             const responseData = JSON.parse(this.responseText);
-            console.log(
-              "📊 Freelancer XHR Response:",
-              responseData.result.projects[0].owner_id
-            );
+            console.log("📊 Freelancer XHR Response:", responseData.result);
+
+            // Extract all required project data
+            const projectData = responseData.result.projects[0];
+            const extractedData = {
+              id: projectData.id,
+              owner_id: projectData.owner_id,
+              preview_description: projectData.preview_description,
+              title: projectData.title,
+              seo_url: projectData.seo_url,
+              type: projectData.type,
+              timestamp: Date.now(),
+            };
+
+            console.log("📊 Extracted project data:", extractedData);
 
             window.postMessage(
               {
-                type: "OWNER_API_INTERCEPTED",
-                owner_id: responseData.result.projects[0].owner_id,
+                type: "PROJECT_DATA_INTERCEPTED",
+                projectData: extractedData,
               },
               "*"
             );

@@ -32,6 +32,7 @@
     "*://freelancer.pk/*",
     "*://freelancer.in/*",
     "https://www.googleapis.com/*",
+    "http://frevo.app/*",
     "http://localhost:3000/*"
   ],
   "oauth2": {

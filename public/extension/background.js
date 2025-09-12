@@ -57,18 +57,117 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 
-  // Handle owner ID storage from interceptor
-  if (message.type === "STORE_OWNER_ID") {
-    chrome.storage.local.set({ currentOwnerId: message.ownerId }, () => {
+  // Handle project data storage from interceptor
+  if (message.type === "STORE_PROJECT_DATA") {
+    const projectData = message.projectData;
+
+    // Get existing project data hashmap
+    chrome.storage.local.get(["projectDataMap"], (result) => {
       if (chrome.runtime.lastError) {
-        console.error("❌ Error storing owner ID:", chrome.runtime.lastError);
+        console.error(
+          "❌ Error getting project data map:",
+          chrome.runtime.lastError
+        );
         sendResponse({
           success: false,
           error: chrome.runtime.lastError.message,
         });
+        return;
+      }
+
+      // Initialize hashmap if it doesn't exist
+      const projectDataMap = result.projectDataMap || {};
+
+      // Store project data using project ID as key
+      projectDataMap[projectData.id] = {
+        id: projectData.id,
+        owner_id: projectData.owner_id,
+        preview_description: projectData.preview_description,
+        title: projectData.title,
+        seo_url: projectData.seo_url,
+        type: projectData.type,
+        timestamp: projectData.timestamp,
+      };
+
+      // Save updated hashmap
+      chrome.storage.local.set({ projectDataMap }, () => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "❌ Error storing project data:",
+            chrome.runtime.lastError
+          );
+          sendResponse({
+            success: false,
+            error: chrome.runtime.lastError.message,
+          });
+        } else {
+          console.log(`✅ Project data stored for ID: ${projectData.id}`);
+          console.log(
+            `📊 Total projects in map: ${Object.keys(projectDataMap).length}`
+          );
+          sendResponse({ success: true });
+        }
+      });
+    });
+
+    return true; // Keep message channel open for async response
+  }
+
+  // Handle getting project data by SEO URL path
+  if (message.type === "GET_PROJECT_DATA_BY_SEO_URL") {
+    const seoUrlPath = message.seoUrlPath;
+
+    console.log("🔍 Looking for project with SEO URL path:", seoUrlPath);
+
+    // Get project data from hashmap
+    chrome.storage.local.get(["projectDataMap"], (result) => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "❌ Error getting project data map:",
+          chrome.runtime.lastError
+        );
+        sendResponse({
+          success: false,
+          error: chrome.runtime.lastError.message,
+        });
+        return;
+      }
+
+      const projectDataMap = result.projectDataMap || {};
+
+      // Loop through all projects to find matching seo_url
+      let foundProject = null;
+      let foundProjectId = null;
+
+      for (const [projectId, projectData] of Object.entries(projectDataMap)) {
+        if (projectData.seo_url === seoUrlPath) {
+          foundProject = projectData;
+          foundProjectId = projectId;
+          break;
+        }
+      }
+
+      if (foundProject) {
+        console.log(
+          `✅ Found project data for SEO URL: ${seoUrlPath} (Project ID: ${foundProjectId})`
+        );
+        sendResponse({
+          success: true,
+          projectData: foundProject,
+        });
       } else {
-        console.log(`✅ Owner ID stored: ${message.ownerId}`);
-        sendResponse({ success: true });
+        console.log(`❌ No project data found for SEO URL: ${seoUrlPath}`);
+        console.log(
+          "📊 Available projects in map:",
+          Object.keys(projectDataMap).map((id) => ({
+            id: id,
+            seo_url: projectDataMap[id].seo_url,
+          }))
+        );
+        sendResponse({
+          success: false,
+          error: "Project data not found for SEO URL",
+        });
       }
     });
 
@@ -91,6 +190,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (result.user) {
         console.log("👁️ User data found:", result.user);
         console.log("👁️ Message data found:", message.data);
+
+        // Log all project data if available
+        if (message.data.projectData) {
+          console.log("📋 Project data included in view event:", {
+            id: message.data.projectData.id,
+            title: message.data.projectData.title,
+            owner_id: message.data.projectData.owner_id,
+            seo_url: message.data.projectData.seo_url,
+            type: message.data.projectData.type,
+          });
+        }
         // Update the user's usage data in sync storage
         const updatedUser = {
           ...result.user,

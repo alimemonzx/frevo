@@ -695,15 +695,12 @@ class ExtensionStateManager {
             "*"
           );
           break;
-        case "OWNER_API_INTERCEPTED":
-          console.log(
-            "🔄 Owner API intercepted, owner ID:",
-            event.data.owner_id
-          );
-          // Forward owner ID to background script for storage
+        case "PROJECT_DATA_INTERCEPTED":
+          console.log("🔄 Project data intercepted:", event.data.projectData);
+          // Forward project data to background script for storage
           chrome.runtime.sendMessage({
-            type: "STORE_OWNER_ID",
-            ownerId: event.data.owner_id,
+            type: "STORE_PROJECT_DATA",
+            projectData: event.data.projectData,
           });
           break;
         case "SPA_NAVIGATION":

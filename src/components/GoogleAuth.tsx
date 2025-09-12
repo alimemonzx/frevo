@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import styled from "styled-components";
+import { API_ENDPOINTS } from "../utils/config";
 
 interface GoogleAuthProps {
   onAuthSuccess: (user: {
@@ -335,18 +336,15 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
     try {
       console.log("🔄 Sending auth request to backend");
 
-      const response = await fetch(
-        "http://localhost:3000/api/auth/google-signin",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            idToken: idToken,
-          }),
-        }
-      );
+      const response = await fetch(API_ENDPOINTS.GOOGLE_SIGNIN, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          idToken: idToken,
+        }),
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -385,6 +383,16 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
         onAuthSuccess(backendUser);
       } else {
         onAuthSuccess(userInfo);
+      }
+
+      // Redirect to freelancer.com/dashboard after successful login
+      try {
+        await chrome.tabs.create({
+          url: "https://www.freelancer.com/dashboard",
+        });
+        console.log("✅ Redirected to freelancer.com/dashboard");
+      } catch (error) {
+        console.error("❌ Failed to redirect to dashboard:", error);
       }
 
       setIsLoading(false);

@@ -42,23 +42,68 @@ const FrevoUser: React.FC<FrevoUserProps> = ({ packageType = "basic" }) => {
     try {
       setIsLoadingDetails(true);
 
-      // Get owner ID from storage
-      const ownerId = await new Promise<string>((resolve, reject) => {
-        if (typeof chrome !== "undefined" && chrome.storage) {
-          chrome.storage.local.get(["currentOwnerId"], (result) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-            } else if (result.currentOwnerId) {
-              resolve(result.currentOwnerId);
-            } else {
-              reject(new Error("No owner ID found in storage"));
+      // Extract SEO URL path from current URL using split
+      // Example: https://www.freelancer.com/projects/android/Taxi-App-enhancement-new-features/details
+      // Extract: "android/Taxi-App-enhancement-new-features"
+      const currentUrl = window.location.href;
+      console.log("🌐 Current URL:", currentUrl);
+
+      // Split URL by "/projects/" and take the second part
+      const urlParts = currentUrl.split("/projects/");
+      console.log("🔍 URL parts after splitting by '/projects/':", urlParts);
+
+      if (urlParts.length < 2) {
+        throw new Error("Could not find '/projects/' in current page URL");
+      }
+
+      // Split the remaining part by "/" and take everything except the last part (which is "details")
+      const projectPath = urlParts[1];
+      console.log("🔍 Project path:", projectPath);
+
+      const pathSegments = projectPath.split("/");
+      console.log("🔍 Path segments:", pathSegments);
+
+      if (pathSegments.length < 2) {
+        throw new Error("Could not extract SEO URL path from current page URL");
+      }
+
+      // Remove the last segment (usually "details") and join the rest
+      const seoUrlPath = pathSegments.slice(0, -1).join("/");
+      console.log("🔍 Extracted SEO URL path:", seoUrlPath);
+
+      const projectData = await new Promise<{
+        id: string;
+        owner_id: string;
+        preview_description: string;
+        title: string;
+        seo_url: string;
+        type: string;
+        timestamp: number;
+      }>((resolve, reject) => {
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage(
+            {
+              type: "GET_PROJECT_DATA_BY_SEO_URL",
+              seoUrlPath: seoUrlPath,
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else if (response.success && response.projectData) {
+                resolve(response.projectData);
+              } else {
+                reject(new Error(response.error || "No project data found"));
+              }
             }
-          });
+          );
         } else {
-          reject(new Error("Chrome storage not available"));
+          reject(new Error("Chrome runtime not available"));
         }
       });
 
+      const ownerId = projectData.owner_id;
+
+      console.log("🔄 Project data retrieved:", projectData);
       console.log("🔄 Fetching job owner details for ID:", ownerId);
 
       const response = await fetchJobOwnerDetails(ownerId);
@@ -79,13 +124,14 @@ const FrevoUser: React.FC<FrevoUserProps> = ({ packageType = "basic" }) => {
         });
         setIsRevealed(true);
 
-        // Send jobs view event to background script
+        // Send jobs view event to background script with all project data
         const message = {
           type: "JOBS_VIEW_EVENT",
           data: {
             usageType: "user_detail_views",
             usage: response.usage || { used: 0, limit: 0, remaining: 0 },
             ownerId: ownerId,
+            projectData: projectData, // Include all project data
             timestamp: Date.now(),
           },
         };

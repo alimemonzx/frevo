@@ -1,4 +1,6 @@
 // Authentication utility functions for Chrome extension
+import { API_ENDPOINTS } from "./config";
+
 export interface User {
   email: string;
   name: string;
@@ -175,16 +177,6 @@ export const makeAuthenticatedRequest = async (
     headers,
   });
 };
-
-/**
- * Backend API endpoints
- */
-export const API_ENDPOINTS = {
-  GOOGLE_SIGNIN: "http://localhost:3000/api/auth/google-signin",
-  USER_PROFILE: "http://localhost:3000/api/users/profile",
-  JOB_OWNER_DETAILS: "http://localhost:3000/api/users/job-owner-details",
-  USAGE_STATS: "http://localhost:3000/api/user/usage",
-} as const;
 
 /**
  * Authenticate with backend using Google ID token

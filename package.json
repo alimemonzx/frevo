@@ -4,10 +4,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode development",
+    "dev:prod": "vite --mode production",
     "build": "npm run build:popup && npm run build:all-content",
-    "build:popup": "vite build",
+    "build:dev": "npm run build:popup:dev && npm run build:all-content:dev",
+    "build:popup": "vite build --mode production",
+    "build:popup:dev": "vite build --mode development",
     "build:all-content": "vite build --mode all-content",
+    "build:all-content:dev": "vite build --mode all-content",
     "lint": "eslint .",
     "preview": "vite preview"
   },

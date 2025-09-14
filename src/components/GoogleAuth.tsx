@@ -384,17 +384,6 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
       } else {
         onAuthSuccess(userInfo);
       }
-
-      // Redirect to freelancer.com/dashboard after successful login
-      try {
-        await chrome.tabs.create({
-          url: "https://www.freelancer.com/dashboard",
-        });
-        console.log("✅ Redirected to freelancer.com/dashboard");
-      } catch (error) {
-        console.error("❌ Failed to redirect to dashboard:", error);
-      }
-
       setIsLoading(false);
     } catch (apiError) {
       console.error("❌ Error calling backend API:", apiError);

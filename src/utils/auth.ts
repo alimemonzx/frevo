@@ -317,3 +317,91 @@ export const fetchJobOwnerDetails = async (
     throw error;
   }
 };
+
+/**
+ * Check if freelancer profile has already been saved
+ */
+export const isFreelancerProfileSaved = async (): Promise<boolean> => {
+  try {
+    const result = await chrome.storage.local.get(["freelancerProfileSaved"]);
+    return result.freelancerProfileSaved === true;
+  } catch (error) {
+    console.error("Error checking freelancer profile save status:", error);
+    return false;
+  }
+};
+
+/**
+ * Mark freelancer profile as saved
+ */
+export const markFreelancerProfileSaved = async (): Promise<void> => {
+  try {
+    await chrome.storage.local.set({
+      freelancerProfileSaved: true,
+      freelancerProfileSavedAt: Date.now(),
+    });
+    console.log("✅ Freelancer profile marked as saved");
+  } catch (error) {
+    console.error("Error marking freelancer profile as saved:", error);
+    throw error;
+  }
+};
+
+/**
+ * Save freelancer profile data to backend
+ */
+export const saveFreelancerProfile = async (profileData: {
+  role: string;
+  username: string;
+  email: string;
+  city: string;
+  country: string;
+  name: string;
+  description?: string;
+}): Promise<{ success: boolean; message?: string }> => {
+  try {
+    console.log("🔄 Saving freelancer profile...", profileData);
+
+    const response = await makeAuthenticatedRequest(
+      API_ENDPOINTS.FREELANCER_PROFILE,
+      {
+        method: "POST",
+        body: JSON.stringify(profileData),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to save freelancer profile: ${response.status} - ${errorText}`
+      );
+    }
+
+    const result = await response.json();
+    console.log("✅ Freelancer profile saved successfully");
+
+    // Mark as saved in storage
+    await markFreelancerProfileSaved();
+
+    return result;
+  } catch (error) {
+    console.error("❌ Error saving freelancer profile:", error);
+    throw error;
+  }
+};
+
+/**
+ * Automatically enable the extension after successful authentication
+ */
+export const enableExtensionAfterLogin = async (): Promise<void> => {
+  try {
+    await chrome.storage.sync.set({ enabled: true });
+    console.log("✅ Extension automatically enabled after login");
+    console.log(
+      "🎉 Extension is now active! You can start using all features."
+    );
+  } catch (error) {
+    console.error("❌ Error enabling extension after login:", error);
+    throw error;
+  }
+};

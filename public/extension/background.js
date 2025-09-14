@@ -205,7 +205,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const updatedUser = {
           ...result.user,
           daily_usage: {
-            ...result.user.daily_usage,
+            ...(result.user.daily_usage || {}),
             [message.data.usageType]: message.data.usage,
           },
         };

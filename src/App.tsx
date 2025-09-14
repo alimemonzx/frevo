@@ -8,6 +8,10 @@ import { FilterIcon, StarIcon, LoadingSpinner } from "./components/Icons";
 import GoogleAuth from "./components/GoogleAuth";
 import UserProfile from "./components/UserProfile";
 import { API_ENDPOINTS } from "./utils/config";
+import {
+  makeAuthenticatedRequest,
+  enableExtensionAfterLogin,
+} from "./utils/auth";
 
 // User type
 interface User {
@@ -634,30 +638,45 @@ function App() {
 
       // Fetch user profile with usage data
       try {
-        const authToken = await chrome.storage.local.get(["authToken"]);
-        if (authToken.authToken) {
-          const response = await fetch(API_ENDPOINTS.USER_PROFILE, {
+        const response = await makeAuthenticatedRequest(
+          API_ENDPOINTS.USER_PROFILE,
+          {
             method: "GET",
-            headers: {
-              Authorization: `Bearer ${authToken.authToken}`,
-              "Content-Type": "application/json",
-            },
-          });
+          }
+        );
 
-          if (response.ok) {
-            const profileData = await response.json();
-            const updatedUser = {
-              ...userData,
-              package_type: profileData.user.package_type,
-              daily_usage: profileData.user.daily_usage,
-            };
-            setUser(updatedUser);
-            chrome.storage.sync.set({ user: updatedUser });
-            console.log("✅ User profile with usage data loaded");
+        if (response.ok) {
+          const profileData = await response.json();
+          console.log("🔍 Profile data:", profileData);
+          const updatedUser = {
+            ...userData,
+            package_type: profileData.user.package_type,
+            daily_usage: profileData.user.daily_usage || null,
+          };
+          setUser(updatedUser);
+          chrome.storage.sync.set({ user: updatedUser });
+          console.log("✅ User profile with usage data loaded");
+
+          // Automatically enable the extension after successful login
+          await enableExtensionAfterLogin();
+          setIsEnabled(true);
+
+          // Redirect to freelancer.com/dashboard after successful login
+          try {
+            await chrome.tabs.create({
+              url: "https://www.freelancer.com/dashboard",
+            });
+            console.log("✅ Redirected to freelancer.com/dashboard");
+          } catch (error) {
+            console.error("❌ Failed to redirect to dashboard:", error);
           }
         }
       } catch (error) {
         console.error("❌ Failed to fetch user profile:", error);
+
+        // Even if profile fetch fails, still enable the extension
+        await enableExtensionAfterLogin();
+        setIsEnabled(true);
       }
     }
   };

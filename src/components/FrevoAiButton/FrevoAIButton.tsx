@@ -1,6 +1,32 @@
 // src/components/FrevoAIButton.tsx
 import React, { useState } from "react";
 import styles from "./FrevoAIButton.module.css";
+import { API_ENDPOINTS } from "../../utils/config";
+import { makeAuthenticatedRequest } from "../../utils/auth";
+
+// TypeScript interfaces for proposal generation
+interface ProposalGenerateRequest {
+  jobTitle: string;
+  jobDescription: string;
+  jobRequirements?: string;
+  budget?: string;
+  timeline?: string;
+}
+
+interface ProposalGenerateResponse {
+  success: boolean;
+  proposal: {
+    id: string;
+    text: string;
+    job_title: string;
+    created_at: string;
+  };
+  usage: {
+    used: string;
+    limit: string;
+    remaining: string;
+  };
+}
 
 // Lightning Icon Component
 export const LightningIcon: React.FC = () => (
@@ -38,65 +64,89 @@ export const SpinnerIcon: React.FC = () => (
 
 // Props interface for FrevoButton
 interface FrevoButtonProps {
-  projectDescription?: string;
+  jobTitle?: string;
+  jobDescription?: string;
+  jobRequirements?: string;
+  budget?: string;
+  timeline?: string;
   variant?: "primary" | "secondary";
   size?: "sm" | "md" | "lg";
 }
 
 // Main Frevo Button Component
 export const FrevoAIButton: React.FC<FrevoButtonProps> = ({
-  projectDescription = "",
+  jobTitle = "",
+  jobDescription = "",
+  jobRequirements = "",
+  budget = "",
+  timeline = "",
   variant = "primary",
   size = "md",
 }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Generate proposal function using backend
-  const generateProposal = async (description: string): Promise<void> => {
-    if (!description) {
+  const generateProposal = async (): Promise<void> => {
+    if (!jobTitle || !jobDescription) {
       alert(
-        "Could not find project description. Please refresh the page and try again."
+        "Job title and description are required. Please refresh the page and try again."
       );
-      throw new Error("No project description");
+      throw new Error("Missing required job information");
     }
 
     try {
-      // Call your backend API instead of OpenAI directly
-      const response = await fetch(
-        "https://your-backend-url.com/api/generate-proposal",
+      const requestBody: ProposalGenerateRequest = {
+        jobTitle,
+        jobDescription,
+        ...(jobRequirements && { jobRequirements }),
+        ...(budget && { budget }),
+        ...(timeline && { timeline }),
+      };
+
+      const response = await makeAuthenticatedRequest(
+        API_ENDPOINTS.PROPOSAL_GENERATE,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            projectDescription: description,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
       if (!response.ok) {
-        throw new Error(`Backend API call failed: ${response.status}`);
+        throw new Error(`API call failed: ${response.status}`);
       }
 
-      const data = await response.json();
-      const proposal = data.proposal;
+      const data: ProposalGenerateResponse = await response.json();
 
-      if (proposal) {
+      if (data.success && data.proposal) {
         const textarea = document.querySelector("#descriptionTextArea");
         if (textarea) {
-          (textarea as HTMLTextAreaElement).value = proposal;
+          (textarea as HTMLTextAreaElement).value = data.proposal.text;
           textarea.dispatchEvent(new Event("input", { bubbles: true }));
           textarea.dispatchEvent(new Event("change", { bubbles: true }));
           (textarea as HTMLTextAreaElement).focus();
-          console.log("✅ Proposal pasted into textarea");
+          console.log("✅ Proposal generated and pasted into textarea");
+          console.log("📊 Usage stats:", data.usage);
         } else {
           console.log("❌ Textarea not found");
         }
+      } else {
+        throw new Error("Failed to generate proposal");
       }
     } catch (error) {
-      console.error("Error calling backend:", error);
-      alert("Error generating proposal. Please try again later.");
+      console.error("Error calling proposal generation API:", error);
+
+      // Handle authentication errors specifically
+      if (
+        error instanceof Error &&
+        error.message.includes("No authentication token")
+      ) {
+        alert(
+          "Please log in to use Frevo AI. Click the user profile to authenticate."
+        );
+      } else {
+        alert("Error generating proposal. Please try again later.");
+      }
+
       throw error;
     }
   };
@@ -106,7 +156,7 @@ export const FrevoAIButton: React.FC<FrevoButtonProps> = ({
     setIsLoading(true);
 
     try {
-      await generateProposal(projectDescription);
+      await generateProposal();
     } catch (error) {
       console.error("Error in proposal generation:", error);
     } finally {

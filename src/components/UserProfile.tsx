@@ -153,49 +153,52 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
         <LogoutButton onClick={onLogout}>Sign out</LogoutButton>
       </ProfileHeader>
 
-      {isBasicPlan && dailyUsage && (
-        <UsageSection>
-          <UsageItem>
-            <UsageLabel>Profile Views</UsageLabel>
-            <UsageValue>
-              {dailyUsage.user_detail_views.remaining} /{" "}
-              {dailyUsage.user_detail_views.limit} left
-            </UsageValue>
-          </UsageItem>
-          <UsageBar>
-            <UsageProgress
-              percentage={
-                (dailyUsage.user_detail_views.used /
-                  dailyUsage.user_detail_views.limit) *
-                100
-              }
-              color={getUsageColor(
-                dailyUsage.user_detail_views.used,
-                dailyUsage.user_detail_views.limit
-              )}
-            />
-          </UsageBar>
+      {isBasicPlan &&
+        dailyUsage &&
+        dailyUsage.user_detail_views &&
+        dailyUsage.proposals && (
+          <UsageSection>
+            <UsageItem>
+              <UsageLabel>Profile Views</UsageLabel>
+              <UsageValue>
+                {dailyUsage.user_detail_views.remaining} /{" "}
+                {dailyUsage.user_detail_views.limit} left
+              </UsageValue>
+            </UsageItem>
+            <UsageBar>
+              <UsageProgress
+                percentage={
+                  (dailyUsage.user_detail_views.used /
+                    dailyUsage.user_detail_views.limit) *
+                  100
+                }
+                color={getUsageColor(
+                  dailyUsage.user_detail_views.used,
+                  dailyUsage.user_detail_views.limit
+                )}
+              />
+            </UsageBar>
 
-          <UsageItem>
-            <UsageLabel>Proposals</UsageLabel>
-            <UsageValue>
-              {dailyUsage.proposals.remaining} / {dailyUsage.proposals.limit}{" "}
-              left
-            </UsageValue>
-          </UsageItem>
-          <UsageBar>
-            <UsageProgress
-              percentage={
-                (dailyUsage.proposals.used / dailyUsage.proposals.limit) * 100
-              }
-              color={getUsageColor(
-                dailyUsage.proposals.used,
-                dailyUsage.proposals.limit
-              )}
-            />
-          </UsageBar>
-        </UsageSection>
-      )}
+            <UsageItem>
+              <UsageLabel>Proposals</UsageLabel>
+              <UsageValue>
+                {dailyUsage.proposals.remaining} / {dailyUsage.proposals.limit}{" "}
+                left
+              </UsageValue>
+            </UsageItem>
+            <UsageBar>
+              <UsageProgress
+                percentage={
+                  (dailyUsage.proposals.used / dailyUsage.proposals.limit) * 100
+                }
+                color={getUsageColor(
+                  dailyUsage.proposals.used,
+                  dailyUsage.proposals.limit
+                )}
+              />
+            </UsageBar>
+          </UsageSection>
+        )}
     </ProfileContainer>
   );
 };

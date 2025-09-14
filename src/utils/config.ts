@@ -37,6 +37,8 @@ export const API_ENDPOINTS = {
   USER_PROFILE: `${getBaseUrl()}/api/users/profile`,
   JOB_OWNER_DETAILS: `${getBaseUrl()}/api/users/job-owner-details`,
   USAGE_STATS: `${getBaseUrl()}/api/user/usage`,
+  PROPOSAL_GENERATE: `${getBaseUrl()}/api/proposals/generate`,
+  FREELANCER_PROFILE: `${getBaseUrl()}/api/users/freelancer-profile`,
 } as const;
 
 // Log configuration on startup (only in development)

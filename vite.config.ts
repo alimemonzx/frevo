@@ -4,10 +4,12 @@ import { copyFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
 export default defineConfig(({ mode }) => {
-  // Load environment variables
+  // Load environment variables based on mode
   const env = loadEnv(mode, process.cwd(), "");
-  const isContentBuild = mode === "content";
-  const isAllContentBuild = mode === "all-content"; // New mode for building all content scripts
+
+  // Determine build type based on npm script
+  const isContentBuild =
+    process.env.npm_lifecycle_event?.includes("all-content");
 
   return {
     base: "./",
@@ -25,124 +27,67 @@ export default defineConfig(({ mode }) => {
         writeBundle() {
           const outDir = resolve(__dirname, "dist");
 
-          // Copy manifest.json to root of dist
-          const manifestSrc = resolve(
-            __dirname,
-            "public/extension/manifest.json"
-          );
-          const manifestDest = resolve(outDir, "manifest.json");
-          if (existsSync(manifestSrc)) {
-            copyFileSync(manifestSrc, manifestDest);
-            console.log("✅ manifest.json copied to dist/");
-          }
+          // Copy extension files to dist
+          const filesToCopy = [
+            { src: "public/extension/manifest.json", dest: "manifest.json" },
+            { src: "public/extension/background.js", dest: "background.js" },
+            { src: "public/extension/inject.js", dest: "inject.js" },
+            { src: "public/extension/interceptor.js", dest: "interceptor.js" },
+          ];
 
-          // Copy background.js to root of dist
-          const backgroundSrc = resolve(
-            __dirname,
-            "public/extension/background.js"
-          );
-          const backgroundDest = resolve(outDir, "background.js");
-          if (existsSync(backgroundSrc)) {
-            copyFileSync(backgroundSrc, backgroundDest);
-            console.log("✅ background.js copied to dist/");
-          }
-
-          // Copy inject.js to root of dist
-          const injectSrc = resolve(__dirname, "public/extension/inject.js");
-          const injectDest = resolve(outDir, "inject.js");
-          if (existsSync(injectSrc)) {
-            copyFileSync(injectSrc, injectDest);
-            console.log("✅ inject.js copied to dist/");
-          }
-
-          const interceptorSrc = resolve(
-            __dirname,
-            "public/extension/interceptor.js"
-          );
-          const interceptorDest = resolve(outDir, "interceptor.js");
-          if (existsSync(interceptorSrc)) {
-            copyFileSync(interceptorSrc, interceptorDest);
-            console.log("✅ interceptor.js copied to dist/");
-          }
-
-          console.log("✅ Extension files copied to dist/");
+          filesToCopy.forEach(({ src, dest }) => {
+            const srcPath = resolve(__dirname, src);
+            const destPath = resolve(outDir, dest);
+            if (existsSync(srcPath)) {
+              copyFileSync(srcPath, destPath);
+              console.log(`✅ ${dest} copied to dist/`);
+            }
+          });
         },
       },
     ],
-
     build: {
       rollupOptions: {
-        input: (() => {
-          if (isContentBuild) {
-            return {
+        input: isContentBuild
+          ? {
               content: "src/content-script.tsx",
               content2: "src/content-script-2.tsx",
-            } as Record<string, string>;
-          } else if (isAllContentBuild) {
-            // Build multiple content scripts at once
-            return {
-              content: "src/content-script.tsx",
-              content2: "src/content-script-2.tsx",
-              // Add more content scripts here as needed
-              // content3: "src/content-script-3.tsx",
-            } as Record<string, string>;
-          } else {
-            return { popup: "index.html" } as Record<string, string>;
-          }
-        })(),
+            }
+          : { popup: "index.html" },
         output: {
           entryFileNames: (chunkInfo) => {
-            if (isContentBuild && chunkInfo.name === "content") {
-              return "assets/content.js";
-            } else if (isAllContentBuild) {
-              // Map content script names to their output files
+            if (isContentBuild) {
               const contentScriptMap: Record<string, string> = {
                 content: "assets/content.js",
                 content2: "assets/content2.js",
-                // 'content3': 'assets/content3.js',
               };
               return contentScriptMap[chunkInfo.name] || "assets/[name].js";
-            } else {
-              return "assets/[name].js";
             }
+            return "assets/[name].js";
           },
           chunkFileNames: "assets/[name].js",
           assetFileNames: (assetInfo) => {
-            // Handle CSS modules for extensions
             if (assetInfo.name?.endsWith(".css")) {
               return "assets/[name]";
             }
             return "assets/[name].[ext]";
           },
           format: "es",
-          name: undefined,
         },
       },
       outDir: "dist",
-      emptyOutDir: !(isContentBuild || isAllContentBuild),
-      // CSS modules support for extensions
-      cssCodeSplit: false, // Bundle CSS with JS for extensions
+      emptyOutDir: !isContentBuild,
+      cssCodeSplit: false,
       minify: true,
-      // Inline CSS for content scripts to work in shadow DOM
-      ...(isContentBuild || isAllContentBuild
-        ? {
-            cssInlineLimit: 999999, // Force all CSS to be inlined
-          }
-        : {}),
+      ...(isContentBuild && {
+        cssInlineLimit: 999999, // Force all CSS to be inlined for content scripts
+      }),
     },
     css: {
       modules: {
-        // Generate scoped class names for CSS modules
         generateScopedName: "[name]__[local]___[hash:base64:5]",
-        // Enable CSS modules for .module.css files
         localsConvention: "camelCase",
       },
-      // For content scripts, inject CSS as JS
-      ...(isContentBuild || isAllContentBuild
-        ? {
-            preprocessorOptions: {},
-          }
-        : {}),
     },
   };
 });

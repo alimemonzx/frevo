@@ -10,8 +10,8 @@
     "build:dev": "npm run build:popup:dev && npm run build:all-content:dev",
     "build:popup": "vite build --mode production",
     "build:popup:dev": "vite build --mode development",
-    "build:all-content": "vite build --mode all-content",
-    "build:all-content:dev": "vite build --mode all-content",
+    "build:all-content": "vite build --mode production",
+    "build:all-content:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
   },

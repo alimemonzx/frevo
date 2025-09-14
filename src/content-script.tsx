@@ -1,9 +1,23 @@
 import { createRoot, type Root } from "react-dom/client";
 import { FrevoAIButton } from "./components/FrevoAiButton/FrevoAIButton";
 import FrevoUser from "./components/FrevoUser/FrevoUser";
-import { fetchUserProfile, getAuthToken, type UserProfile } from "./utils/auth";
+import {
+  fetchUserProfile,
+  getAuthToken,
+  saveFreelancerProfile,
+  isFreelancerProfileSaved,
+  type UserProfile,
+} from "./utils/auth";
 
 // Using CSS modules for extension-compatible styling!
+
+interface JobDetails {
+  title: string;
+  description: string;
+  requirements: string;
+  budget: string;
+  timeline: string;
+}
 
 interface ExtensionState {
   filterEnabled: boolean;
@@ -11,7 +25,7 @@ interface ExtensionState {
   jobsPerPage: number;
   frevoButtonInjected: boolean;
   frevoUserInjected: boolean;
-  projectDescription: string;
+  jobDetails: JobDetails;
   currentUrl: string;
   observer: MutationObserver | null;
   scriptInjected: boolean;
@@ -31,7 +45,13 @@ class ExtensionStateManager {
     jobsPerPage: 20,
     frevoButtonInjected: false,
     frevoUserInjected: false,
-    projectDescription: "",
+    jobDetails: {
+      title: "",
+      description: "",
+      requirements: "",
+      budget: "",
+      timeline: "",
+    },
     currentUrl: window.location.href,
     observer: null,
     scriptInjected: false,
@@ -120,6 +140,100 @@ class ExtensionStateManager {
     }
   }
 
+  private async checkAndHandleFreelancerProfileSave(responseData: {
+    result?: {
+      chosen_role?: string;
+      username?: string;
+      email?: string;
+      id?: string;
+      location?: {
+        city?: string;
+        country?: {
+          name?: string;
+        };
+      };
+      public_name?: string;
+      profile_description?: string;
+    };
+  }): Promise<void> {
+    try {
+      // Check if freelancer profile has already been saved
+      const alreadySaved = await isFreelancerProfileSaved();
+      if (alreadySaved) {
+        console.log(
+          "🔄 Freelancer profile already saved, skipping POST request"
+        );
+        return;
+      }
+
+      // If not saved, proceed with the save
+      await this.handleFreelancerProfileSave(responseData);
+    } catch (error) {
+      console.error(
+        "❌ Failed to check freelancer profile save status:",
+        error
+      );
+    }
+  }
+
+  private async handleFreelancerProfileSave(responseData: {
+    result?: {
+      chosen_role?: string;
+      username?: string;
+      email?: string;
+      id?: string;
+      location?: {
+        city?: string;
+        country?: {
+          name?: string;
+        };
+      };
+      public_name?: string;
+      profile_description?: string;
+    };
+  }): Promise<void> {
+    try {
+      // Check if user is authenticated
+      const authToken = await getAuthToken();
+      if (!authToken) {
+        console.log(
+          "No auth token available, skipping freelancer profile save"
+        );
+        return;
+      }
+
+      // Extract user data from the response
+      const userData = responseData.result;
+      if (!userData) {
+        console.log(
+          "No user data found in response, skipping freelancer profile save"
+        );
+        return;
+      }
+
+      // Map the response data to the API body format
+      const profileData = {
+        role: userData.chosen_role || "freelancer",
+        displayName: userData.public_name || userData.username || "",
+        username: userData.username || "",
+        email: userData.email || "",
+        city: userData.location?.city || "",
+        country: userData.location?.country?.name || "",
+        name: userData.public_name || userData.username || "",
+        description: userData.profile_description || "",
+        freelancer_id: userData.id || "",
+      };
+
+      console.log("🔄 Saving freelancer profile with data:", profileData);
+
+      // Call the API to save the profile
+      const result = await saveFreelancerProfile(profileData);
+      console.log("✅ Freelancer profile saved successfully:", result);
+    } catch (error) {
+      console.error("❌ Failed to save freelancer profile:", error);
+    }
+  }
+
   private isDetailPage(): boolean {
     const path = window.location.pathname;
     return path.includes("/details") && path.split("/").length > 2;
@@ -130,29 +244,95 @@ class ExtensionStateManager {
     return path.includes("/search/projects");
   }
 
-  private async extractProjectDescription(): Promise<string> {
+  private async extractJobDetails(): Promise<JobDetails> {
     return new Promise((resolve) => {
       let attempts = 0;
       const maxAttempts = 10;
 
-      const findDescription = () => {
+      const findJobDetails = () => {
         attempts++;
+
+        // Extract job title - using the actual Freelancer.com selectors
+        const titleElement =
+          document.querySelector("app-project-title h1 span") ||
+          document.querySelector("app-project-title h1") ||
+          document.querySelector(".ProjectDetailsCard-title") ||
+          document.querySelector("h1");
+        const title = titleElement?.textContent?.trim() || "";
+
+        // Extract job description
         const descriptionElement = document.querySelector(
           ".ProjectDescription"
         );
+        const description = descriptionElement?.textContent?.trim() || "";
 
-        if (descriptionElement) {
-          const description = descriptionElement.textContent?.trim() || "";
-          this.state.projectDescription = description;
-          resolve(description);
+        // Extract job requirements (look for common requirement selectors)
+        const requirementsElement =
+          document.querySelector(".ProjectRequirements") ||
+          document.querySelector(".requirements") ||
+          document.querySelector("[data-testid='requirements']");
+        const requirements = requirementsElement?.textContent?.trim() || "";
+
+        // Extract budget information - using the actual Freelancer.com selectors
+        const budgetElement =
+          document.querySelector(
+            "app-project-details-budget .ProjectViewDetails-budget p"
+          ) ||
+          document.querySelector("app-project-details-budget p") ||
+          document.querySelector(".ProjectViewDetails-budget p") ||
+          document.querySelector(".ProjectBudget") ||
+          document.querySelector(".budget");
+        const budget = budgetElement?.textContent?.trim() || "";
+
+        // Extract timeline information - look for bidding end time or duration
+        const timelineElement =
+          document.querySelector(
+            "app-project-details-budget fl-relative-time span"
+          ) ||
+          document.querySelector("fl-relative-time span") ||
+          document.querySelector(".ProjectTimeline") ||
+          document.querySelector(".timeline") ||
+          document.querySelector("[data-testid='timeline']") ||
+          document.querySelector(".duration");
+        const timeline = timelineElement?.textContent?.trim() || "";
+
+        const jobDetails: JobDetails = {
+          title,
+          description,
+          requirements,
+          budget,
+          timeline,
+        };
+
+        // Debug logging to help troubleshoot extraction
+        console.log("🔍 Job extraction attempt", attempts, ":", {
+          title: title ? `"${title}"` : "NOT FOUND",
+          description: description
+            ? `"${description.substring(0, 100)}..."`
+            : "NOT FOUND",
+          budget: budget ? `"${budget}"` : "NOT FOUND",
+          timeline: timeline ? `"${timeline}"` : "NOT FOUND",
+        });
+
+        // If we have at least title and description, we can proceed
+        if (title && description) {
+          this.state.jobDetails = jobDetails;
+          console.log("✅ Job details extracted successfully:", jobDetails);
+          resolve(jobDetails);
         } else if (attempts < maxAttempts) {
-          setTimeout(findDescription, 500);
+          setTimeout(findJobDetails, 500);
         } else {
-          resolve("");
+          console.log(
+            "❌ Could not find complete job details after 10 attempts"
+          );
+          console.log("📋 Final extraction result:", jobDetails);
+          // Still resolve with what we have
+          this.state.jobDetails = jobDetails;
+          resolve(jobDetails);
         }
       };
 
-      findDescription();
+      findJobDetails();
     });
   }
 
@@ -302,7 +482,13 @@ class ExtensionStateManager {
       // 🎯 RENDER REACT WITH CONSISTENT BUTTON HEIGHT AND STYLING
       root.render(
         <div style={{ display: "flex", alignItems: "center" }}>
-          <FrevoAIButton projectDescription={this.state.projectDescription} />
+          <FrevoAIButton
+            jobTitle={this.state.jobDetails.title}
+            jobDescription={this.state.jobDetails.description}
+            jobRequirements={this.state.jobDetails.requirements}
+            budget={this.state.jobDetails.budget}
+            timeline={this.state.jobDetails.timeline}
+          />
         </div>
       );
 
@@ -471,7 +657,13 @@ class ExtensionStateManager {
 
       // Reset state
       this.state.frevoButtonInjected = false;
-      this.state.projectDescription = "";
+      this.state.jobDetails = {
+        title: "",
+        description: "",
+        requirements: "",
+        budget: "",
+        timeline: "",
+      };
       this.state.isInitializing = false;
       this.state.shadowRoot = null;
     } catch (error) {
@@ -601,7 +793,7 @@ class ExtensionStateManager {
     console.log("🎯 Initializing Frevo with button alignment");
 
     try {
-      await this.extractProjectDescription();
+      await this.extractJobDetails();
       await this.injectFrevoButton();
       // Inject FrevoUser immediately - it will get ownerId from storage when needed
       this.pollForElementAndInject();
@@ -624,8 +816,11 @@ class ExtensionStateManager {
         if (!this.state.frevoButtonInjected) {
           this.injectFrevoButton();
         }
-        if (!this.state.projectDescription) {
-          this.extractProjectDescription();
+        if (
+          !this.state.jobDetails.title ||
+          !this.state.jobDetails.description
+        ) {
+          this.extractJobDetails();
         }
         // Handle FrevoUser injection if not already injected
         if (!this.state.frevoUserInjected) {
@@ -703,6 +898,15 @@ class ExtensionStateManager {
             projectData: event.data.projectData,
           });
           break;
+        case "SELF_API_INTERCEPTED":
+          console.log("🔄 Self API intercepted with profile_description=true");
+          console.log("📊 Original URL:", event.data.originalUrl);
+          console.log("📊 Modified URL:", event.data.modifiedUrl);
+          console.log("📊 Response Data:", event.data.responseData);
+
+          // Check if freelancer profile has already been saved before handling
+          this.checkAndHandleFreelancerProfileSave(event.data.responseData);
+          break;
         case "SPA_NAVIGATION":
           // Handle SPA navigation events from injected script
           console.log("🚀 SPA navigation detected");
@@ -778,7 +982,13 @@ class ExtensionStateManager {
           this.state.filterEnabled = false;
           this.state.minStarRating = 0;
           this.state.jobsPerPage = 20;
-          this.state.projectDescription = "";
+          this.state.jobDetails = {
+            title: "",
+            description: "",
+            requirements: "",
+            budget: "",
+            timeline: "",
+          };
 
           // Cleanup any injected components
           await this.cleanupFrevoButton();
@@ -817,7 +1027,7 @@ class ExtensionStateManager {
           if (this.isDetailPage()) {
             await this.cleanupFrevoButton();
             setTimeout(async () => {
-              await this.extractProjectDescription();
+              await this.extractJobDetails();
               await this.injectFrevoButton();
             }, 100);
           }

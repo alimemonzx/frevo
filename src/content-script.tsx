@@ -214,7 +214,6 @@ class ExtensionStateManager {
       // Map the response data to the API body format
       const profileData = {
         role: userData.chosen_role || "freelancer",
-        displayName: userData.public_name || userData.username || "",
         username: userData.username || "",
         email: userData.email || "",
         city: userData.location?.city || "",
@@ -230,7 +229,12 @@ class ExtensionStateManager {
       const result = await saveFreelancerProfile(profileData);
       console.log("✅ Freelancer profile saved successfully:", result);
     } catch (error) {
-      console.error("❌ Failed to save freelancer profile:", error);
+      // Check if it's a 409 error (profile already exists)
+      if (error instanceof Error && error.message.includes("409")) {
+        console.log("ℹ️ Freelancer profile already exists, no action needed");
+      } else {
+        console.error("❌ Failed to save freelancer profile:", error);
+      }
     }
   }
 

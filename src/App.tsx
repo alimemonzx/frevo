@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import styled, { keyframes } from "styled-components";
 import { Header } from "./components/Header";
 import { StatusCard } from "./components/StatusCard";
@@ -7,11 +7,7 @@ import { Footer } from "./components/Footer";
 import { FilterIcon, StarIcon, LoadingSpinner } from "./components/Icons";
 import GoogleAuth from "./components/GoogleAuth";
 import UserProfile from "./components/UserProfile";
-import { API_ENDPOINTS } from "./utils/config";
-import {
-  makeAuthenticatedRequest,
-  enableExtensionAfterLogin,
-} from "./utils/auth";
+import { enableExtensionAfterLogin, fetchUserProfile } from "./utils/auth";
 
 // User type
 interface User {
@@ -275,6 +271,58 @@ function App() {
   const [minStarRating, setMinStarRating] = useState<number>(0);
   const [jobsPerPage, setJobsPerPage] = useState<number>(20);
 
+  // Function to fetch and update user profile with latest daily_usage data
+  const fetchAndUpdateProfile = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      // Check if we recently fetched profile data (within last 5 minutes)
+      const lastFetchTime = await new Promise<number>((resolve) => {
+        if (typeof chrome !== "undefined" && chrome.storage) {
+          chrome.storage.local.get(["lastProfileFetchTime"], (result) => {
+            resolve(result.lastProfileFetchTime || 0);
+          });
+        } else {
+          resolve(0);
+        }
+      });
+
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+      if (now - lastFetchTime < fiveMinutes) {
+        console.log("⏭️ Skipping profile fetch - recently updated");
+        return;
+      }
+
+      console.log("🔄 Fetching latest profile data...");
+      const profileData = await fetchUserProfile();
+      console.log("🔍 Latest profile data:", profileData);
+
+      const updatedUser = {
+        ...user,
+        package_type: profileData.user.package_type,
+        daily_usage: profileData.user.daily_usage || null,
+      };
+
+      setUser(updatedUser);
+
+      // Update storage with latest data
+      if (typeof chrome !== "undefined" && chrome.storage) {
+        chrome.storage.sync.set({ user: updatedUser }, () => {
+          console.log("✅ User profile with latest usage data updated");
+        });
+
+        // Store the fetch time to implement caching
+        chrome.storage.local.set({ lastProfileFetchTime: now }, () => {
+          console.log("✅ Profile fetch time cached");
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error fetching latest profile data:", error);
+    }
+  }, [user]);
+
   // Load initial state from Chrome storage
   useEffect(() => {
     const loadData = async () => {
@@ -327,6 +375,13 @@ function App() {
 
     loadData();
   }, []);
+
+  // Fetch latest profile data whenever popup opens and user is authenticated
+  useEffect(() => {
+    if (user && !isAuthLoading) {
+      fetchAndUpdateProfile();
+    }
+  }, [user, isAuthLoading, fetchAndUpdateProfile]);
 
   // Listen for storage changes to update user data when sync storage is updated
   useEffect(() => {
@@ -638,38 +693,29 @@ function App() {
 
       // Fetch user profile with usage data
       try {
-        const response = await makeAuthenticatedRequest(
-          API_ENDPOINTS.USER_PROFILE,
-          {
-            method: "GET",
-          }
-        );
+        const profileData = await fetchUserProfile();
+        console.log("🔍 Profile data:", profileData);
+        const updatedUser = {
+          ...userData,
+          package_type: profileData.user.package_type,
+          daily_usage: profileData.user.daily_usage || null,
+        };
+        setUser(updatedUser);
+        chrome.storage.sync.set({ user: updatedUser });
+        console.log("✅ User profile with usage data loaded");
 
-        if (response.ok) {
-          const profileData = await response.json();
-          console.log("🔍 Profile data:", profileData);
-          const updatedUser = {
-            ...userData,
-            package_type: profileData.user.package_type,
-            daily_usage: profileData.user.daily_usage || null,
-          };
-          setUser(updatedUser);
-          chrome.storage.sync.set({ user: updatedUser });
-          console.log("✅ User profile with usage data loaded");
+        // Automatically enable the extension after successful login
+        await enableExtensionAfterLogin();
+        setIsEnabled(true);
 
-          // Automatically enable the extension after successful login
-          await enableExtensionAfterLogin();
-          setIsEnabled(true);
-
-          // Redirect to freelancer.com/dashboard after successful login
-          try {
-            await chrome.tabs.create({
-              url: "https://www.freelancer.com/dashboard",
-            });
-            console.log("✅ Redirected to freelancer.com/dashboard");
-          } catch (error) {
-            console.error("❌ Failed to redirect to dashboard:", error);
-          }
+        // Redirect to freelancer.com/dashboard after successful login
+        try {
+          await chrome.tabs.create({
+            url: "https://www.freelancer.com/dashboard",
+          });
+          console.log("✅ Redirected to freelancer.com/dashboard");
+        } catch (error) {
+          console.error("❌ Failed to redirect to dashboard:", error);
         }
       } catch (error) {
         console.error("❌ Failed to fetch user profile:", error);

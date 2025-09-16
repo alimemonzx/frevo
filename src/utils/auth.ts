@@ -372,6 +372,14 @@ export const saveFreelancerProfile = async (profileData: {
 
     if (!response.ok) {
       const errorText = await response.text();
+
+      // Handle 409 - Profile already exists (this is not really an error)
+      if (response.status === 409) {
+        console.log("ℹ️ Freelancer profile already exists, marking as saved");
+        await markFreelancerProfileSaved();
+        return { success: true, message: "Profile already exists" };
+      }
+
       throw new Error(
         `Failed to save freelancer profile: ${response.status} - ${errorText}`
       );

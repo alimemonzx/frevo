@@ -5,7 +5,7 @@ interface User {
   email: string;
   name: string;
   picture: string;
-  package_type?: "basic" | "premium" | "pro";
+  package_type?: "basic" | "plus" | "premium";
   daily_usage?: {
     proposals: {
       used: number;
@@ -130,7 +130,6 @@ const UsageProgress = styled.div<{ percentage: number; color: string }>`
 `;
 
 export const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
-  const isBasicPlan = user.package_type === "basic";
   const dailyUsage = user.daily_usage;
 
   const getUsageColor = (used: number, limit: number) => {
@@ -138,6 +137,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
     if (percentage >= 90) return "#ef4444";
     if (percentage >= 70) return "#f59e0b";
     return "#10b981";
+  };
+
+  const formatLimit = (limit: number) => {
+    return limit > 100000 ? "Unlimited" : limit.toString();
   };
 
   return (
@@ -153,52 +156,49 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout }) => {
         <LogoutButton onClick={onLogout}>Sign out</LogoutButton>
       </ProfileHeader>
 
-      {isBasicPlan &&
-        dailyUsage &&
-        dailyUsage.user_detail_views &&
-        dailyUsage.proposals && (
-          <UsageSection>
-            <UsageItem>
-              <UsageLabel>Profile Views</UsageLabel>
-              <UsageValue>
-                {dailyUsage.user_detail_views.remaining} /{" "}
-                {dailyUsage.user_detail_views.limit} left
-              </UsageValue>
-            </UsageItem>
-            <UsageBar>
-              <UsageProgress
-                percentage={
-                  (dailyUsage.user_detail_views.used /
-                    dailyUsage.user_detail_views.limit) *
-                  100
-                }
-                color={getUsageColor(
-                  dailyUsage.user_detail_views.used,
-                  dailyUsage.user_detail_views.limit
-                )}
-              />
-            </UsageBar>
+      {dailyUsage && dailyUsage.user_detail_views && dailyUsage.proposals && (
+        <UsageSection>
+          <UsageItem>
+            <UsageLabel>Profile Views</UsageLabel>
+            <UsageValue>
+              {dailyUsage.user_detail_views.remaining} /{" "}
+              {formatLimit(dailyUsage.user_detail_views.limit)} left
+            </UsageValue>
+          </UsageItem>
+          <UsageBar>
+            <UsageProgress
+              percentage={
+                (dailyUsage.user_detail_views.used /
+                  dailyUsage.user_detail_views.limit) *
+                100
+              }
+              color={getUsageColor(
+                dailyUsage.user_detail_views.used,
+                dailyUsage.user_detail_views.limit
+              )}
+            />
+          </UsageBar>
 
-            <UsageItem>
-              <UsageLabel>Proposals</UsageLabel>
-              <UsageValue>
-                {dailyUsage.proposals.remaining} / {dailyUsage.proposals.limit}{" "}
-                left
-              </UsageValue>
-            </UsageItem>
-            <UsageBar>
-              <UsageProgress
-                percentage={
-                  (dailyUsage.proposals.used / dailyUsage.proposals.limit) * 100
-                }
-                color={getUsageColor(
-                  dailyUsage.proposals.used,
-                  dailyUsage.proposals.limit
-                )}
-              />
-            </UsageBar>
-          </UsageSection>
-        )}
+          <UsageItem>
+            <UsageLabel>Proposals</UsageLabel>
+            <UsageValue>
+              {dailyUsage.proposals.remaining} /{" "}
+              {formatLimit(dailyUsage.proposals.limit)} left
+            </UsageValue>
+          </UsageItem>
+          <UsageBar>
+            <UsageProgress
+              percentage={
+                (dailyUsage.proposals.used / dailyUsage.proposals.limit) * 100
+              }
+              color={getUsageColor(
+                dailyUsage.proposals.used,
+                dailyUsage.proposals.limit
+              )}
+            />
+          </UsageBar>
+        </UsageSection>
+      )}
     </ProfileContainer>
   );
 };

@@ -1,9 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import styles from "./FrevoUser.module.css";
-import { fetchJobOwnerDetails } from "../../utils/auth";
+import {
+  fetchJobOwnerDetails,
+  getCachedJobOwnerDetails,
+  type CachedJobOwnerDetails,
+} from "../../utils/auth";
 
 interface FrevoUserProps {
-  packageType?: "basic" | "premium" | "pro";
+  packageType?: "basic" | "plus" | "premium";
 }
 
 const FrevoUser: React.FC<FrevoUserProps> = ({ packageType = "basic" }) => {
@@ -19,58 +23,48 @@ const FrevoUser: React.FC<FrevoUserProps> = ({ packageType = "basic" }) => {
     name: string;
     username: string;
   } | null>(null);
+  const [hasCachedData, setHasCachedData] = useState(false);
+  const [isCheckingCache, setIsCheckingCache] = useState(true);
+  const [isComponentVisible, setIsComponentVisible] = useState(false);
 
   const shouldShowUsername = actualUserData?.name !== actualUserData?.username;
   const isBasicPlan = packageType === "basic";
+  const isPremiumPlan = packageType === "plus" || packageType === "premium";
 
-  const handleEyeClick = async () => {
-    console.log("👁️ Eye button clicked!", {
-      isRevealed,
-      isLoadingDetails,
-    });
-
-    if (isRevealed) {
-      console.log("❌ Already revealed");
-      return;
-    }
-
-    if (isLoadingDetails) {
-      console.log("❌ Already loading");
-      return;
-    }
-
+  // Reusable function to get project data and check cache
+  const getProjectDataAndCheckCache = useCallback(async (): Promise<{
+    projectData: {
+      id: string;
+      owner_id: string;
+      preview_description: string;
+      title: string;
+      seo_url: string;
+      type: string;
+      timestamp: number;
+    } | null;
+    cachedData: CachedJobOwnerDetails | null;
+  }> => {
     try {
-      setIsLoadingDetails(true);
-
-      // Extract SEO URL path from current URL using split
-      // Example: https://www.freelancer.com/projects/android/Taxi-App-enhancement-new-features/details
-      // Extract: "android/Taxi-App-enhancement-new-features"
+      // Extract SEO URL path from current URL
       const currentUrl = window.location.href;
-      console.log("🌐 Current URL:", currentUrl);
-
-      // Split URL by "/projects/" and take the second part
       const urlParts = currentUrl.split("/projects/");
-      console.log("🔍 URL parts after splitting by '/projects/':", urlParts);
 
       if (urlParts.length < 2) {
-        throw new Error("Could not find '/projects/' in current page URL");
+        console.log("❌ Could not find '/projects/' in current page URL");
+        return { projectData: null, cachedData: null };
       }
 
-      // Split the remaining part by "/" and take everything except the last part (which is "details")
       const projectPath = urlParts[1];
-      console.log("🔍 Project path:", projectPath);
-
       const pathSegments = projectPath.split("/");
-      console.log("🔍 Path segments:", pathSegments);
 
       if (pathSegments.length < 2) {
-        throw new Error("Could not extract SEO URL path from current page URL");
+        console.log("❌ Could not extract SEO URL path from current page URL");
+        return { projectData: null, cachedData: null };
       }
 
-      // Remove the last segment (usually "details") and join the rest
       const seoUrlPath = pathSegments.slice(0, -1).join("/");
-      console.log("🔍 Extracted SEO URL path:", seoUrlPath);
 
+      // Get project data to extract job ID and owner ID
       const projectData = await new Promise<{
         id: string;
         owner_id: string;
@@ -102,11 +96,253 @@ const FrevoUser: React.FC<FrevoUserProps> = ({ packageType = "basic" }) => {
       });
 
       const ownerId = projectData.owner_id;
+      const jobId = projectData.id;
+
+      // Check if we have cached data
+      const cachedData = await getCachedJobOwnerDetails(jobId, ownerId);
+
+      return { projectData, cachedData };
+    } catch (error) {
+      console.error("❌ Error getting project data:", error);
+      return { projectData: null, cachedData: null };
+    }
+  }, []);
+
+  // Auto-fetch function for premium users
+  const handleAutoFetch = useCallback(async () => {
+    try {
+      setIsLoadingDetails(true);
+
+      // Use the reusable function to get project data
+      const { projectData } = await getProjectDataAndCheckCache();
+
+      if (!projectData) {
+        throw new Error("Could not get project data");
+      }
+
+      const ownerId = projectData.owner_id;
+      const jobId = projectData.id;
 
       console.log("🔄 Project data retrieved:", projectData);
-      console.log("🔄 Fetching job owner details for ID:", ownerId);
+      console.log(
+        "🔄 Auto-fetching job owner details for ID:",
+        ownerId,
+        "Job ID:",
+        jobId
+      );
 
-      const response = await fetchJobOwnerDetails(ownerId);
+      const response = await fetchJobOwnerDetails(ownerId, jobId);
+      console.log("✅ Job owner details auto-fetched:", response);
+
+      if (response.success && response.job_owner) {
+        const avatarUrl = response.job_owner.avatar;
+        const processedAvatarUrl = avatarUrl
+          ? avatarUrl.startsWith("//")
+            ? `https:${avatarUrl}`
+            : avatarUrl
+          : defaultImage;
+
+        setActualUserData({
+          image: processedAvatarUrl,
+          name: response.job_owner.public_name,
+          username: response.job_owner.username,
+        });
+        setIsRevealed(true);
+
+        // Send jobs view event to background script with all project data
+        const message = {
+          type: "JOBS_VIEW_EVENT",
+          data: {
+            usageType: "user_detail_views",
+            usage: response.usage || { used: 0, limit: 0, remaining: 0 },
+            ownerId: ownerId,
+            projectData: projectData, // Include all project data
+            timestamp: Date.now(),
+          },
+        };
+        console.log("📤 FrevoUser sending jobs view event:", message);
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage(message, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "❌ Error sending jobs view event:",
+                chrome.runtime.lastError
+              );
+            } else {
+              console.log("✅ Jobs view event sent successfully:", response);
+            }
+          });
+        }
+
+        console.log(
+          "✅ User details auto-revealed, usage updated:",
+          response.usage
+        );
+      } else {
+        // Check if it's a 429 error (rate limit exceeded)
+        if (
+          response.error &&
+          response.message &&
+          response.usage &&
+          response.limit
+        ) {
+          console.log("🚫 Daily limit exceeded:", response);
+          setUpgradeMessage(response.message);
+          setShowUpgradePopup(true);
+          setIsLoadingDetails(false);
+          return;
+        }
+        throw new Error("API returned unsuccessful response");
+      }
+    } catch (error) {
+      console.error("❌ Failed to auto-fetch user details:", error);
+      setIsLoadingDetails(false);
+    }
+  }, [getProjectDataAndCheckCache]);
+
+  // Check for cached data on component mount
+  useEffect(() => {
+    const checkCachedData = async () => {
+      try {
+        setIsCheckingCache(true);
+
+        // For basic plan users, hide component initially
+        if (isBasicPlan) {
+          console.log("🔒 Basic plan user - component hidden initially");
+          setIsComponentVisible(false);
+          setHasCachedData(false);
+          setIsCheckingCache(false);
+          return;
+        }
+
+        // For premium plan users, show component and auto-load data
+        if (isPremiumPlan) {
+          console.log("⭐ Premium plan user - auto-loading data");
+          setIsComponentVisible(true);
+          setIsLoadingDetails(true);
+        }
+
+        const { projectData, cachedData } = await getProjectDataAndCheckCache();
+
+        if (!projectData) {
+          setHasCachedData(false);
+          if (isPremiumPlan) {
+            setIsLoadingDetails(false);
+          }
+          return;
+        }
+
+        if (cachedData) {
+          console.log(
+            "✅ Found cached data on component mount - showing immediately"
+          );
+          console.log(
+            "💰 No eye icon needed - user data already available from cache"
+          );
+          setHasCachedData(true);
+          setIsRevealed(true);
+          setIsComponentVisible(true);
+
+          const avatarUrl = cachedData.job_owner.avatar;
+          const processedAvatarUrl = avatarUrl
+            ? avatarUrl.startsWith("//")
+              ? `https:${avatarUrl}`
+              : avatarUrl
+            : defaultImage;
+
+          setActualUserData({
+            image: processedAvatarUrl,
+            name: cachedData.job_owner.public_name,
+            username: cachedData.job_owner.username,
+          });
+        } else {
+          console.log(
+            "❌ No cached data found - will show eye icon and blur effect"
+          );
+          console.log(
+            "👁️ User will need to click eye icon to fetch data (uses daily usage)"
+          );
+          setHasCachedData(false);
+
+          // For premium users, auto-fetch data if no cache
+          if (isPremiumPlan) {
+            console.log("🔄 Premium user - auto-fetching data since no cache");
+            await handleAutoFetch();
+          }
+        }
+      } catch (error) {
+        console.error("❌ Error checking cached data:", error);
+        setHasCachedData(false);
+        if (isPremiumPlan) {
+          setIsLoadingDetails(false);
+        }
+      } finally {
+        setIsCheckingCache(false);
+      }
+    };
+
+    checkCachedData();
+  }, [
+    isBasicPlan,
+    isPremiumPlan,
+    handleAutoFetch,
+    getProjectDataAndCheckCache,
+  ]);
+
+  const handleEyeClick = async () => {
+    console.log("👁️ Eye button clicked!", {
+      isRevealed,
+      isLoadingDetails,
+      hasCachedData,
+      isBasicPlan,
+    });
+
+    // For basic plan users, show the component when eye is clicked
+    if (isBasicPlan && !isComponentVisible) {
+      console.log("🔓 Basic plan user - showing component on eye click");
+      setIsComponentVisible(true);
+      setIsLoadingDetails(true);
+      await handleAutoFetch();
+      return;
+    }
+
+    if (isRevealed) {
+      console.log("❌ Already revealed");
+      return;
+    }
+
+    if (isLoadingDetails) {
+      console.log("❌ Already loading");
+      return;
+    }
+
+    if (hasCachedData) {
+      console.log("❌ Already have cached data, no need to fetch");
+      return;
+    }
+
+    try {
+      setIsLoadingDetails(true);
+
+      // Use the reusable function to get project data
+      const { projectData } = await getProjectDataAndCheckCache();
+
+      if (!projectData) {
+        throw new Error("Could not get project data");
+      }
+
+      const ownerId = projectData.owner_id;
+      const jobId = projectData.id;
+
+      console.log("🔄 Project data retrieved:", projectData);
+      console.log(
+        "🔄 Fetching job owner details for ID:",
+        ownerId,
+        "Job ID:",
+        jobId
+      );
+
+      const response = await fetchJobOwnerDetails(ownerId, jobId);
       console.log("✅ Job owner details fetched:", response);
 
       if (response.success && response.job_owner) {
@@ -174,8 +410,17 @@ const FrevoUser: React.FC<FrevoUserProps> = ({ packageType = "basic" }) => {
 
   // Use actual data if available, otherwise use default placeholder
   const displayImage = actualUserData?.image || defaultImage;
-  const displayName = actualUserData?.name || "Loading...";
-  const displayUsername = actualUserData?.username || "loading";
+  const displayName =
+    actualUserData?.name || (isCheckingCache ? "Checking..." : "Loading...");
+  const displayUsername =
+    actualUserData?.username || (isCheckingCache ? "checking" : "loading");
+
+  // Determine if we should show blur effect and eye icon
+  const shouldShowBlurAndEye = isBasicPlan && !isRevealed && !hasCachedData;
+
+  // Determine if we should show blur effect and spinner for premium users during auto-fetch
+  const shouldShowBlurAndSpinner =
+    (isPremiumPlan && isLoadingDetails && !isRevealed) || shouldShowBlurAndEye;
 
   return (
     <>
@@ -183,13 +428,16 @@ const FrevoUser: React.FC<FrevoUserProps> = ({ packageType = "basic" }) => {
         <div className={styles.imageContainer}>
           <img
             className={`${styles.userImage} ${
-              isBasicPlan && !isRevealed ? styles.blurred : ""
+              shouldShowBlurAndSpinner ? styles.blurred : ""
             }`}
             src={displayImage}
             alt={`${displayName}`}
           />
-          {isBasicPlan && !isRevealed && (
-            <div className={styles.eyeIcon} onClick={handleEyeClick}>
+          {shouldShowBlurAndSpinner && (
+            <div
+              className={styles.eyeIcon}
+              onClick={shouldShowBlurAndEye ? handleEyeClick : undefined}
+            >
               {isLoadingDetails ? (
                 <div className={styles.loadingSpinner}></div>
               ) : (
@@ -211,20 +459,18 @@ const FrevoUser: React.FC<FrevoUserProps> = ({ packageType = "basic" }) => {
         <div className={styles.userInfo}>
           <span
             className={`${styles.userName} ${
-              isBasicPlan && !isRevealed ? styles.blurred : ""
+              shouldShowBlurAndSpinner ? styles.blurred : ""
             }`}
           >
-            {isBasicPlan && !isRevealed ? "Sample User" : displayName}
+            {shouldShowBlurAndEye ? "Sample User" : displayName}
           </span>
           {shouldShowUsername && (
             <span
               className={`${styles.username} ${
-                isBasicPlan && !isRevealed ? styles.blurred : ""
+                shouldShowBlurAndSpinner ? styles.blurred : ""
               }`}
             >
-              {isBasicPlan && !isRevealed
-                ? "@sampleuser"
-                : `@${displayUsername}`}
+              {shouldShowBlurAndEye ? "@sampleuser" : `@${displayUsername}`}
             </span>
           )}
         </div>

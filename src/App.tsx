@@ -14,7 +14,7 @@ interface User {
   email: string;
   name: string;
   picture: string;
-  package_type?: "basic" | "premium" | "pro";
+  package_type?: "basic" | "plus" | "premium";
   daily_usage?: {
     proposals: {
       used: number;

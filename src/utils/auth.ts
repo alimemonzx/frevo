@@ -18,7 +18,7 @@ export interface UserProfile {
   email: string;
   name: string;
   picture: string;
-  package_type: "basic" | "premium" | "pro";
+  package_type: "basic" | "plus" | "premium";
   subscription_status: "active" | "inactive" | "cancelled";
   created_at: string;
   updated_at: string;
@@ -253,12 +253,29 @@ export const fetchUserProfile = async (): Promise<{
 };
 
 /**
- * Fetch job owner details from backend
+ * Fetch job owner details from backend with caching
  */
 export const fetchJobOwnerDetails = async (
-  ownerId: string
+  ownerId: string,
+  jobId?: string
 ): Promise<JobOwnerResponse> => {
   try {
+    // If jobId is provided, check cache first
+    if (jobId) {
+      const cachedData = await getCachedJobOwnerDetails(jobId, ownerId);
+      if (cachedData) {
+        console.log("✅ Using cached job owner details for job:", jobId);
+        console.log("💰 Saved API call - using local cache");
+        return {
+          success: true,
+          job_owner: cachedData.job_owner,
+          usage: cachedData.usage,
+        };
+      } else {
+        console.log("🔄 No cache found for job:", jobId, "- making API call");
+      }
+    }
+
     console.log("🔄 Fetching job owner details for ownerId:", ownerId);
 
     const response = await makeAuthenticatedRequest(
@@ -310,6 +327,17 @@ export const fetchJobOwnerDetails = async (
 
     const result = await response.json();
     console.log("✅ Job owner details fetched successfully");
+
+    // Cache the result if jobId is provided and request was successful
+    if (jobId && result.success && result.job_owner && result.usage) {
+      console.log("💾 Caching job owner details for future use");
+      await cacheJobOwnerDetails(
+        jobId,
+        ownerId,
+        result.job_owner,
+        result.usage
+      );
+    }
 
     return result;
   } catch (error) {
@@ -395,6 +423,182 @@ export const saveFreelancerProfile = async (profileData: {
   } catch (error) {
     console.error("❌ Error saving freelancer profile:", error);
     throw error;
+  }
+};
+
+/**
+ * Cache management for job owner details
+ */
+export interface CachedJobOwnerDetails {
+  job_owner: JobOwnerDetails;
+  usage: {
+    used: number;
+    limit: number;
+    remaining: number;
+  };
+  cached_at: number;
+  job_id: string;
+  owner_id: string;
+}
+
+/**
+ * Check if cache should be cleared (daily reset)
+ */
+export const shouldClearJobOwnerCache = async (): Promise<boolean> => {
+  try {
+    const result = await chrome.storage.local.get(["lastCacheClearDate"]);
+    const lastClearDate = result.lastCacheClearDate;
+    const today = new Date().toDateString();
+
+    if (!lastClearDate || lastClearDate !== today) {
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Error checking cache clear date:", error);
+    return true; // Clear cache on error to be safe
+  }
+};
+
+/**
+ * Clear job owner cache and update clear date
+ */
+export const clearJobOwnerCache = async (): Promise<void> => {
+  try {
+    await chrome.storage.local.remove(["jobOwnerCache"]);
+    await chrome.storage.local.set({
+      lastCacheClearDate: new Date().toDateString(),
+    });
+    console.log("✅ Job owner cache cleared for new day");
+  } catch (error) {
+    console.error("Error clearing job owner cache:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get cached job owner details
+ */
+export const getCachedJobOwnerDetails = async (
+  jobId: string,
+  ownerId: string
+): Promise<CachedJobOwnerDetails | null> => {
+  try {
+    // Check if cache should be cleared first
+    if (await shouldClearJobOwnerCache()) {
+      await clearJobOwnerCache();
+      return null;
+    }
+
+    const result = await chrome.storage.local.get(["jobOwnerCache"]);
+    const cache = result.jobOwnerCache || {};
+    const cacheKey = `${jobId}_${ownerId}`;
+
+    const cachedData = cache[cacheKey];
+    if (cachedData) {
+      console.log("✅ Found cached job owner details for:", cacheKey);
+      console.log(
+        "📊 Cache entry age:",
+        Math.round((Date.now() - cachedData.cached_at) / 1000),
+        "seconds"
+      );
+      return cachedData;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error getting cached job owner details:", error);
+    return null;
+  }
+};
+
+/**
+ * Cache job owner details
+ */
+export const cacheJobOwnerDetails = async (
+  jobId: string,
+  ownerId: string,
+  jobOwner: JobOwnerDetails,
+  usage: { used: number; limit: number; remaining: number }
+): Promise<void> => {
+  try {
+    const result = await chrome.storage.local.get(["jobOwnerCache"]);
+    const cache = result.jobOwnerCache || {};
+    const cacheKey = `${jobId}_${ownerId}`;
+
+    cache[cacheKey] = {
+      job_owner: jobOwner,
+      usage: usage,
+      cached_at: Date.now(),
+      job_id: jobId,
+      owner_id: ownerId,
+    };
+
+    await chrome.storage.local.set({ jobOwnerCache: cache });
+    console.log("✅ Job owner details cached for:", cacheKey);
+  } catch (error) {
+    console.error("Error caching job owner details:", error);
+    // Don't throw error as caching failure shouldn't break the main flow
+  }
+};
+
+/**
+ * Get cache statistics
+ */
+export const getJobOwnerCacheStats = async (): Promise<{
+  totalEntries: number;
+  lastClearDate: string | null;
+  cacheSize: number;
+}> => {
+  try {
+    const result = await chrome.storage.local.get([
+      "jobOwnerCache",
+      "lastCacheClearDate",
+    ]);
+    const cache = result.jobOwnerCache || {};
+    const totalEntries = Object.keys(cache).length;
+    const cacheSize = JSON.stringify(cache).length;
+
+    return {
+      totalEntries,
+      lastClearDate: result.lastCacheClearDate || null,
+      cacheSize,
+    };
+  } catch (error) {
+    console.error("Error getting cache stats:", error);
+    return {
+      totalEntries: 0,
+      lastClearDate: null,
+      cacheSize: 0,
+    };
+  }
+};
+
+/**
+ * Manually clear job owner cache (for debugging or manual reset)
+ */
+export const manualClearJobOwnerCache = async (): Promise<void> => {
+  try {
+    await chrome.storage.local.remove(["jobOwnerCache", "lastCacheClearDate"]);
+    console.log("✅ Job owner cache manually cleared");
+  } catch (error) {
+    console.error("Error manually clearing job owner cache:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get all cached job owner details (for debugging)
+ */
+export const getAllCachedJobOwnerDetails = async (): Promise<
+  Record<string, CachedJobOwnerDetails>
+> => {
+  try {
+    const result = await chrome.storage.local.get(["jobOwnerCache"]);
+    return result.jobOwnerCache || {};
+  } catch (error) {
+    console.error("Error getting all cached job owner details:", error);
+    return {};
   }
 };
 

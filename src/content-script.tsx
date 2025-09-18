@@ -6,6 +6,8 @@ import {
   getAuthToken,
   saveFreelancerProfile,
   isFreelancerProfileSaved,
+  shouldClearJobOwnerCache,
+  clearJobOwnerCache,
   type UserProfile,
 } from "./utils/auth";
 
@@ -82,6 +84,9 @@ class ExtensionStateManager {
     try {
       await this.loadStorageData();
 
+      // Initialize cache system (check if daily clear is needed)
+      await this.initializeCacheSystem();
+
       // Check if extension is enabled before proceeding
       if (!this.state.filterEnabled) {
         console.log("🔒 Extension is disabled, skipping initialization");
@@ -119,6 +124,21 @@ class ExtensionStateManager {
         });
       });
     });
+  }
+
+  private async initializeCacheSystem(): Promise<void> {
+    try {
+      // Check if cache should be cleared (daily reset)
+      if (await shouldClearJobOwnerCache()) {
+        await clearJobOwnerCache();
+        console.log("🔄 Job owner cache cleared for new day");
+      } else {
+        console.log("✅ Job owner cache is up to date");
+      }
+    } catch (error) {
+      console.error("❌ Error initializing cache system:", error);
+      // Don't throw error as cache initialization failure shouldn't break the extension
+    }
   }
 
   private async loadUserProfile(): Promise<void> {

@@ -10,6 +10,7 @@ import {
   clearJobOwnerCache,
   type UserProfile,
 } from "./utils/auth";
+import logger from "./utils/logger";
 
 // Using CSS modules for extension-compatible styling!
 
@@ -89,7 +90,7 @@ class ExtensionStateManager {
 
       // Check if extension is enabled before proceeding
       if (!this.state.filterEnabled) {
-        console.log("🔒 Extension is disabled, skipping initialization");
+        logger.log("🔒 Extension is disabled, skipping initialization");
         return;
       }
 
@@ -106,9 +107,9 @@ class ExtensionStateManager {
         await this.filterProjectsByRating();
       }
 
-      console.log("✅ Frevo Extension with aligned buttons initialized");
+      logger.log("✅ Frevo Extension with aligned buttons initialized");
     } catch (error) {
-      console.error("❌ Extension initialization failed:", error);
+      logger.error("❌ Extension initialization failed:", error);
     }
   }
 
@@ -131,12 +132,12 @@ class ExtensionStateManager {
       // Check if cache should be cleared (daily reset)
       if (await shouldClearJobOwnerCache()) {
         await clearJobOwnerCache();
-        console.log("🔄 Job owner cache cleared for new day");
+        logger.log("🔄 Job owner cache cleared for new day");
       } else {
-        console.log("✅ Job owner cache is up to date");
+        logger.log("✅ Job owner cache is up to date");
       }
     } catch (error) {
-      console.error("❌ Error initializing cache system:", error);
+      logger.error("❌ Error initializing cache system:", error);
       // Don't throw error as cache initialization failure shouldn't break the extension
     }
   }
@@ -145,16 +146,16 @@ class ExtensionStateManager {
     try {
       const authToken = await getAuthToken();
       if (!authToken) {
-        console.log("No auth token available, skipping user profile load");
+        logger.log("No auth token available, skipping user profile load");
         return;
       }
 
       this.state.isUserProfileLoading = true;
       const profileResponse = await fetchUserProfile();
       this.state.userProfile = profileResponse.user;
-      console.log("✅ User profile loaded:", this.state.userProfile);
+      logger.log("✅ User profile loaded:", this.state.userProfile);
     } catch (error) {
-      console.error("❌ Failed to load user profile:", error);
+      logger.error("❌ Failed to load user profile:", error);
     } finally {
       this.state.isUserProfileLoading = false;
     }
@@ -180,7 +181,7 @@ class ExtensionStateManager {
       // Check if freelancer profile has already been saved
       const alreadySaved = await isFreelancerProfileSaved();
       if (alreadySaved) {
-        console.log(
+        logger.log(
           "🔄 Freelancer profile already saved, skipping POST request"
         );
         return;
@@ -189,10 +190,7 @@ class ExtensionStateManager {
       // If not saved, proceed with the save
       await this.handleFreelancerProfileSave(responseData);
     } catch (error) {
-      console.error(
-        "❌ Failed to check freelancer profile save status:",
-        error
-      );
+      logger.error("❌ Failed to check freelancer profile save status:", error);
     }
   }
 
@@ -216,16 +214,14 @@ class ExtensionStateManager {
       // Check if user is authenticated
       const authToken = await getAuthToken();
       if (!authToken) {
-        console.log(
-          "No auth token available, skipping freelancer profile save"
-        );
+        logger.log("No auth token available, skipping freelancer profile save");
         return;
       }
 
       // Extract user data from the response
       const userData = responseData.result;
       if (!userData) {
-        console.log(
+        logger.log(
           "No user data found in response, skipping freelancer profile save"
         );
         return;
@@ -243,17 +239,17 @@ class ExtensionStateManager {
         freelancer_id: userData.id || "",
       };
 
-      console.log("🔄 Saving freelancer profile with data:", profileData);
+      logger.log("🔄 Saving freelancer profile with data:", profileData);
 
       // Call the API to save the profile
       const result = await saveFreelancerProfile(profileData);
-      console.log("✅ Freelancer profile saved successfully:", result);
+      logger.log("✅ Freelancer profile saved successfully:", result);
     } catch (error) {
       // Check if it's a 409 error (profile already exists)
       if (error instanceof Error && error.message.includes("409")) {
-        console.log("ℹ️ Freelancer profile already exists, no action needed");
+        logger.log("ℹ️ Freelancer profile already exists, no action needed");
       } else {
-        console.error("❌ Failed to save freelancer profile:", error);
+        logger.error("❌ Failed to save freelancer profile:", error);
       }
     }
   }
@@ -329,7 +325,7 @@ class ExtensionStateManager {
         };
 
         // Debug logging to help troubleshoot extraction
-        console.log("🔍 Job extraction attempt", attempts, ":", {
+        logger.log("🔍 Job extraction attempt", attempts, ":", {
           title: title ? `"${title}"` : "NOT FOUND",
           description: description
             ? `"${description.substring(0, 100)}..."`
@@ -341,15 +337,15 @@ class ExtensionStateManager {
         // If we have at least title and description, we can proceed
         if (title && description) {
           this.state.jobDetails = jobDetails;
-          console.log("✅ Job details extracted successfully:", jobDetails);
+          logger.log("✅ Job details extracted successfully:", jobDetails);
           resolve(jobDetails);
         } else if (attempts < maxAttempts) {
           setTimeout(findJobDetails, 500);
         } else {
-          console.log(
+          logger.log(
             "❌ Could not find complete job details after 10 attempts"
           );
-          console.log("📋 Final extraction result:", jobDetails);
+          logger.log("📋 Final extraction result:", jobDetails);
           // Still resolve with what we have
           this.state.jobDetails = jobDetails;
           resolve(jobDetails);
@@ -394,7 +390,7 @@ class ExtensionStateManager {
             const cssStyle = document.createElement("style");
             cssStyle.textContent = css;
             shadowRoot.appendChild(cssStyle);
-            console.log("✅ CSS modules loaded successfully from:", path);
+            logger.log("✅ CSS modules loaded successfully from:", path);
             return;
           }
         } catch {
@@ -402,11 +398,11 @@ class ExtensionStateManager {
         }
       }
 
-      console.log(
+      logger.log(
         "⚠️ CSS modules file not found, components will use fallback styles"
       );
     } catch (error) {
-      console.log("⚠️ Error loading CSS modules:", error);
+      logger.log("⚠️ Error loading CSS modules:", error);
     }
   }
 
@@ -489,11 +485,11 @@ class ExtensionStateManager {
 
     const aiButton = document.querySelector("app-bid-description-button");
     if (!aiButton?.parentElement) {
-      console.log("❌ app-bid-description-button not found");
+      logger.log("❌ app-bid-description-button not found");
       return;
     }
 
-    console.log("✅ Injecting Frevo button with proper alignment");
+    logger.log("✅ Injecting Frevo button with proper alignment");
 
     try {
       // Create shadow DOM container with alignment
@@ -517,16 +513,16 @@ class ExtensionStateManager {
       );
 
       this.state.frevoButtonInjected = true;
-      console.log("✅ Button rendered with perfect alignment!");
+      logger.log("✅ Button rendered with perfect alignment!");
     } catch (error) {
-      console.error("❌ Failed to inject aligned Frevo button:", error);
+      logger.error("❌ Failed to inject aligned Frevo button:", error);
       this.cleanupFrevoButton();
     }
   }
 
   // 🔍 POLL FOR ELEMENT AND INJECT WHEN FOUND
   private pollForElementAndInject(): void {
-    console.log("🔄 Starting polling for ProjectDetailsCard-title element...");
+    logger.log("🔄 Starting polling for ProjectDetailsCard-title element...");
 
     const startTime = Date.now();
     const maxDuration = 20000; // 20 seconds
@@ -535,7 +531,7 @@ class ExtensionStateManager {
     const poll = () => {
       // Check if we've exceeded the time limit
       if (Date.now() - startTime > maxDuration) {
-        console.log(
+        logger.log(
           "❌ Polling timeout: ProjectDetailsCard-title not found after 20 seconds"
         );
         return;
@@ -543,14 +539,14 @@ class ExtensionStateManager {
 
       // Check if already injected
       if (this.state.frevoUserInjected) {
-        console.log("✅ FrevoUser already injected, stopping poll");
+        logger.log("✅ FrevoUser already injected, stopping poll");
         return;
       }
 
       // Try to find the element
       const element = this.findProjectTitleElement();
       if (element) {
-        console.log("✅ Element found! Injecting FrevoUser...");
+        logger.log("✅ Element found! Injecting FrevoUser...");
         this.injectFrevoUserWithElement(element);
         return;
       }
@@ -576,7 +572,7 @@ class ExtensionStateManager {
     for (const selector of selectors) {
       const element = document.querySelector(selector);
       if (element) {
-        console.log(`✅ Found project title with selector: ${selector}`);
+        logger.log(`✅ Found project title with selector: ${selector}`);
         return element;
       }
     }
@@ -589,7 +585,7 @@ class ExtensionStateManager {
   ): Promise<void> {
     if (this.state.frevoUserInjected) return;
 
-    console.log("✅ Injecting FrevoUser component with shadow DOM");
+    logger.log("✅ Injecting FrevoUser component with shadow DOM");
 
     try {
       // Create container element similar to FrevoButton
@@ -640,11 +636,11 @@ class ExtensionStateManager {
       projectTitle.insertAdjacentElement("afterend", container);
 
       this.state.frevoUserInjected = true;
-      console.log(
+      logger.log(
         "✅ FrevoUser component injected successfully with shadow DOM"
       );
     } catch (error) {
-      console.error("❌ Failed to inject FrevoUser component:", error);
+      logger.error("❌ Failed to inject FrevoUser component:", error);
       this.cleanupFrevoUser();
     }
   }
@@ -691,7 +687,7 @@ class ExtensionStateManager {
       this.state.isInitializing = false;
       this.state.shadowRoot = null;
     } catch (error) {
-      console.error("❌ Error during cleanup:", error);
+      logger.error("❌ Error during cleanup:", error);
     }
   }
 
@@ -713,9 +709,9 @@ class ExtensionStateManager {
       this.state.frevoUserInjected = false;
       this.state.userShadowRoot = null;
 
-      console.log("✅ FrevoUser component cleaned up");
+      logger.log("✅ FrevoUser component cleaned up");
     } catch (error) {
-      console.error("❌ Error cleaning up FrevoUser:", error);
+      logger.error("❌ Error cleaning up FrevoUser:", error);
     }
   }
 
@@ -814,7 +810,7 @@ class ExtensionStateManager {
       return;
     }
 
-    console.log("🎯 Initializing Frevo with button alignment");
+    logger.log("🎯 Initializing Frevo with button alignment");
 
     try {
       await this.extractJobDetails();
@@ -823,7 +819,7 @@ class ExtensionStateManager {
       this.pollForElementAndInject();
       this.setupDOMObserver();
     } catch (error) {
-      console.error("❌ Failed to initialize Frevo:", error);
+      logger.error("❌ Failed to initialize Frevo:", error);
     } finally {
       this.state.isInitializing = false;
     }
@@ -915,7 +911,7 @@ class ExtensionStateManager {
           );
           break;
         case "PROJECT_DATA_INTERCEPTED":
-          console.log("🔄 Project data intercepted:", event.data.projectData);
+          logger.log("🔄 Project data intercepted:", event.data.projectData);
           // Forward project data to background script for storage
           chrome.runtime.sendMessage({
             type: "STORE_PROJECT_DATA",
@@ -923,17 +919,17 @@ class ExtensionStateManager {
           });
           break;
         case "SELF_API_INTERCEPTED":
-          console.log("🔄 Self API intercepted with profile_description=true");
-          console.log("📊 Original URL:", event.data.originalUrl);
-          console.log("📊 Modified URL:", event.data.modifiedUrl);
-          console.log("📊 Response Data:", event.data.responseData);
+          logger.log("🔄 Self API intercepted with profile_description=true");
+          logger.log("📊 Original URL:", event.data.originalUrl);
+          logger.log("📊 Modified URL:", event.data.modifiedUrl);
+          logger.log("📊 Response Data:", event.data.responseData);
 
           // Check if freelancer profile has already been saved before handling
           this.checkAndHandleFreelancerProfileSave(event.data.responseData);
           break;
         case "SPA_NAVIGATION":
           // Handle SPA navigation events from injected script
-          console.log("🚀 SPA navigation detected");
+          logger.log("🚀 SPA navigation detected");
           setTimeout(() => this.checkUrlChange(), 100);
           break;
       }
@@ -955,19 +951,19 @@ class ExtensionStateManager {
           // Check if Angular is available
           const windowAny = window as unknown as Record<string, unknown>;
           if (windowAny.ng && (windowAny.ng as Record<string, unknown>).probe) {
-            console.log("🔍 Angular detected, setting up router hooks");
+            logger.log("🔍 Angular detected, setting up router hooks");
             // Set up a more aggressive polling for navigation changes
             setInterval(() => {
               const currentUrl = window.location.href;
               if (currentUrl !== this.state.currentUrl) {
-                console.log("🚀 Angular navigation detected via polling");
+                logger.log("🚀 Angular navigation detected via polling");
                 this.checkUrlChange();
               }
             }, 100); // Very frequent checking
           }
         } catch {
           // Angular not available or error accessing it
-          console.log("ℹ️ Angular router hooks not available");
+          logger.log("ℹ️ Angular router hooks not available");
         }
       };
 
@@ -998,7 +994,7 @@ class ExtensionStateManager {
           if (this.isSearchPage()) {
             await this.restoreAllProjects();
           }
-          console.log("🔒 Extension disabled - all features turned off");
+          logger.log("🔒 Extension disabled - all features turned off");
           break;
 
         case "disable-and-reload":
@@ -1026,7 +1022,7 @@ class ExtensionStateManager {
           // Clear any intervals or observers
           this.cleanup();
 
-          console.log("🔄 Extension disabled - page will reload");
+          logger.log("🔄 Extension disabled - page will reload");
           break;
 
         case "update-rating":
@@ -1060,7 +1056,7 @@ class ExtensionStateManager {
 
       sendResponse({ success: true });
     } catch (error) {
-      console.error("❌ Error handling message:", error);
+      logger.error("❌ Error handling message:", error);
       sendResponse({
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",

@@ -1,14 +1,29 @@
 // Background service worker for Frevo Extension
 
+// Load logger utility
+const logger = (() => {
+  // Simple logger that respects development/production mode
+  // In production builds, this will be silent
+  const isDev = false; // This should be set to true in development builds
+
+  return {
+    log: (...args) => isDev && logger.log(...args),
+    info: (...args) => isDev && console.info(...args),
+    warn: (...args) => isDev && console.warn(...args),
+    error: (...args) => isDev && logger.error(...args),
+    debug: (...args) => isDev && console.debug(...args),
+  };
+})();
+
 chrome.runtime.onInstalled.addListener(() => {
   // Set default value to 20 (matching the UI)
   chrome.storage.local.set({ jobsPerPage: 20 });
-  console.log("✅ Extension installed with default jobsPerPage: 20");
+  logger.log("✅ Extension installed with default jobsPerPage: 20");
 });
 
 // Listen for messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("📨 Received message:", message);
+  logger.log("📨 Received message:", message);
 
   // Handle jobs per page setting
   if (message.type === "SET_JOBS_PER_PAGE") {
@@ -16,16 +31,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     chrome.storage.local.set({ jobsPerPage: value }, () => {
       if (chrome.runtime.lastError) {
-        console.error(
-          "❌ Error setting jobsPerPage:",
-          chrome.runtime.lastError
-        );
+        logger.error("❌ Error setting jobsPerPage:", chrome.runtime.lastError);
         sendResponse({
           success: false,
           error: chrome.runtime.lastError.message,
         });
       } else {
-        console.log(`✅ Successfully set jobsPerPage to: ${value}`);
+        logger.log(`✅ Successfully set jobsPerPage to: ${value}`);
         sendResponse({ success: true, value: value });
       }
     });
@@ -36,15 +48,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_JOBS_PER_PAGE") {
     chrome.storage.local.get(["jobsPerPage"], (result) => {
       if (chrome.runtime.lastError) {
-        console.error(
-          "❌ Error getting jobsPerPage:",
-          chrome.runtime.lastError
-        );
+        logger.error("❌ Error getting jobsPerPage:", chrome.runtime.lastError);
         sendResponse({ value: 20, error: chrome.runtime.lastError.message });
       } else {
         const value =
           result.jobsPerPage !== undefined ? result.jobsPerPage : 20;
-        console.log(`📊 Retrieved jobsPerPage: ${value}`);
+        logger.log(`📊 Retrieved jobsPerPage: ${value}`);
         sendResponse({ value: value });
       }
     });
@@ -53,7 +62,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "LOG_INTERCEPT") {
-    console.log("🔄 API Intercepted:", message.data);
+    logger.log("🔄 API Intercepted:", message.data);
     sendResponse({ success: true });
   }
 
@@ -64,7 +73,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Get existing project data hashmap
     chrome.storage.local.get(["projectDataMap"], (result) => {
       if (chrome.runtime.lastError) {
-        console.error(
+        logger.error(
           "❌ Error getting project data map:",
           chrome.runtime.lastError
         );
@@ -92,7 +101,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Save updated hashmap
       chrome.storage.local.set({ projectDataMap }, () => {
         if (chrome.runtime.lastError) {
-          console.error(
+          logger.error(
             "❌ Error storing project data:",
             chrome.runtime.lastError
           );
@@ -101,8 +110,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             error: chrome.runtime.lastError.message,
           });
         } else {
-          console.log(`✅ Project data stored for ID: ${projectData.id}`);
-          console.log(
+          logger.log(`✅ Project data stored for ID: ${projectData.id}`);
+          logger.log(
             `📊 Total projects in map: ${Object.keys(projectDataMap).length}`
           );
           sendResponse({ success: true });
@@ -117,12 +126,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "GET_PROJECT_DATA_BY_SEO_URL") {
     const seoUrlPath = message.seoUrlPath;
 
-    console.log("🔍 Looking for project with SEO URL path:", seoUrlPath);
+    logger.log("🔍 Looking for project with SEO URL path:", seoUrlPath);
 
     // Get project data from hashmap
     chrome.storage.local.get(["projectDataMap"], (result) => {
       if (chrome.runtime.lastError) {
-        console.error(
+        logger.error(
           "❌ Error getting project data map:",
           chrome.runtime.lastError
         );
@@ -148,7 +157,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       if (foundProject) {
-        console.log(
+        logger.log(
           `✅ Found project data for SEO URL: ${seoUrlPath} (Project ID: ${foundProjectId})`
         );
         sendResponse({
@@ -156,8 +165,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           projectData: foundProject,
         });
       } else {
-        console.log(`❌ No project data found for SEO URL: ${seoUrlPath}`);
-        console.log(
+        logger.log(`❌ No project data found for SEO URL: ${seoUrlPath}`);
+        logger.log(
           "📊 Available projects in map:",
           Object.keys(projectDataMap).map((id) => ({
             id: id,
@@ -179,7 +188,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Get current user data from sync storage
     chrome.storage.sync.get(["user"], (result) => {
       if (chrome.runtime.lastError) {
-        console.error("❌ Error getting user data:", chrome.runtime.lastError);
+        logger.error("❌ Error getting user data:", chrome.runtime.lastError);
         sendResponse({
           success: false,
           error: chrome.runtime.lastError.message,
@@ -188,12 +197,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       if (result.user) {
-        console.log("👁️ User data found:", result.user);
-        console.log("👁️ Message data found:", message.data);
+        logger.log("👁️ User data found:", result.user);
+        logger.log("👁️ Message data found:", message.data);
 
         // Log all project data if available
         if (message.data.projectData) {
-          console.log("📋 Project data included in view event:", {
+          logger.log("📋 Project data included in view event:", {
             id: message.data.projectData.id,
             title: message.data.projectData.title,
             owner_id: message.data.projectData.owner_id,
@@ -213,7 +222,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Store updated user data back to sync storage
         chrome.storage.sync.set({ user: updatedUser }, () => {
           if (chrome.runtime.lastError) {
-            console.error(
+            logger.error(
               "❌ Error updating user usage in sync storage:",
               chrome.runtime.lastError
             );
@@ -222,12 +231,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               error: chrome.runtime.lastError.message,
             });
           } else {
-            console.log("✅ User usage updated in sync storage successfully");
+            logger.log("✅ User usage updated in sync storage successfully");
             sendResponse({ success: true });
           }
         });
       } else {
-        console.log("❌ No user data found in sync storage");
+        logger.log("❌ No user data found in sync storage");
         sendResponse({ success: false, error: "No user data found" });
       }
     });

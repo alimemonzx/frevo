@@ -1,6 +1,21 @@
 // Simple injected script for Freelancer Pagination Modifier
 (function () {
-  console.log("🔄 Simple Pagination injected script loaded");
+  // Load logger utility
+  const logger = (() => {
+    // Simple logger that respects development/production mode
+    // In production builds, this will be silent
+    const isDev = false; // This should be set to true in development builds
+
+    return {
+      log: (...args) => isDev && logger.log(...args),
+      info: (...args) => isDev && console.info(...args),
+      warn: (...args) => isDev && console.warn(...args),
+      error: (...args) => isDev && logger.error(...args),
+      debug: (...args) => isDev && console.debug(...args),
+    };
+  })();
+
+  logger.log("🔄 Simple Pagination injected script loaded");
 
   // Default value - will be updated by content script
   let jobsPerPage = 20;
@@ -36,13 +51,13 @@
       url.searchParams.set("limit", newLimit.toString());
       url.searchParams.set("offset", newOffset.toString());
 
-      console.log(
+      logger.log(
         `📊 Page ${currentPage}: ${oldLimit}×${oldOffset} → ${newLimit}×${newOffset} (using jobsPerPage: ${newLimit})`
       );
 
       return url.toString();
     } catch (error) {
-      console.error("❌ Error modifying URL:", error);
+      logger.error("❌ Error modifying URL:", error);
       return originalUrl;
     }
   }
@@ -59,8 +74,8 @@
       url &&
       url.includes("freelancer.com/api/projects/0.1/projects/active")
     ) {
-      console.log(`🔄 Intercepting fetch: ${url}`);
-      console.log(
+      logger.log(`🔄 Intercepting fetch: ${url}`);
+      logger.log(
         `🎯 Current jobsPerPage value: ${jobsPerPage}, hasReceivedUpdate: ${hasReceivedUpdate}`
       );
 
@@ -68,7 +83,7 @@
       const modifiedUrl = modifyUrlParams(url, jobsPerPage);
 
       if (modifiedUrl !== url) {
-        console.log("✅ Modified fetch URL");
+        logger.log("✅ Modified fetch URL");
 
         // Update the input
         if (typeof input === "string") {
@@ -100,15 +115,15 @@
       url &&
       url.includes("freelancer.com/api/projects/0.1/projects/active")
     ) {
-      console.log(`🔄 Intercepting XHR: ${url}`);
-      console.log(
+      logger.log(`🔄 Intercepting XHR: ${url}`);
+      logger.log(
         `🎯 Current jobsPerPage value: ${jobsPerPage}, hasReceivedUpdate: ${hasReceivedUpdate}`
       );
 
       const modifiedUrl = modifyUrlParams(url, jobsPerPage);
 
       if (modifiedUrl !== url) {
-        console.log("✅ Modified XHR URL");
+        logger.log("✅ Modified XHR URL");
         url = modifiedUrl;
 
         // Notify content script
@@ -132,21 +147,19 @@
 
     if (event.data.type === "UPDATE_JOBS_PER_PAGE") {
       const newValue = event.data.value;
-      console.log(
+      logger.log(
         `📥 Injected Script - Received update: ${jobsPerPage} → ${newValue}`
       );
       jobsPerPage = newValue;
       hasReceivedUpdate = true;
-      console.log(
-        `📊 Injected Script - Updated jobsPerPage to: ${jobsPerPage}`
-      );
+      logger.log(`📊 Injected Script - Updated jobsPerPage to: ${jobsPerPage}`);
     }
   });
 
   // Try to get the value from storage directly as backup
   setTimeout(() => {
     if (!hasReceivedUpdate) {
-      console.log(
+      logger.log(
         "⚠️ No update received from content script, trying direct storage access..."
       );
 
@@ -154,7 +167,7 @@
       if (typeof chrome !== "undefined" && chrome.storage) {
         chrome.storage.local.get(["jobsPerPage"], (result) => {
           if (result.jobsPerPage && result.jobsPerPage !== jobsPerPage) {
-            console.log(`🔄 Direct storage read: ${result.jobsPerPage}`);
+            logger.log(`🔄 Direct storage read: ${result.jobsPerPage}`);
             jobsPerPage = result.jobsPerPage;
             hasReceivedUpdate = true;
           }
@@ -163,5 +176,5 @@
     }
   }, 500);
 
-  console.log("🎯 Simple pagination interceptor ready");
+  logger.log("🎯 Simple pagination interceptor ready");
 })();

@@ -1,5 +1,6 @@
 // Authentication utility functions for Chrome extension
 import { API_ENDPOINTS } from "./config";
+import logger from "./logger";
 
 export interface User {
   email: string;
@@ -89,7 +90,7 @@ export const isAuthenticated = async (): Promise<boolean> => {
 
     return true;
   } catch (error) {
-    console.error("Error checking authentication:", error);
+    logger.error("Error checking authentication:", error);
     return false;
   }
 };
@@ -102,7 +103,7 @@ export const getCurrentUser = async (): Promise<User | null> => {
     const result = await chrome.storage.local.get(["user"]);
     return result.user || null;
   } catch (error) {
-    console.error("Error getting current user:", error);
+    logger.error("Error getting current user:", error);
     return null;
   }
 };
@@ -115,7 +116,7 @@ export const getAuthToken = async (): Promise<string | null> => {
     const result = await chrome.storage.local.get(["authToken"]);
     return result.authToken || null;
   } catch (error) {
-    console.error("Error getting auth token:", error);
+    logger.error("Error getting auth token:", error);
     return null;
   }
 };
@@ -133,9 +134,9 @@ export const storeAuthData = async (
       user,
       lastAuthTime: Date.now(),
     });
-    console.log("✅ Auth data stored successfully");
+    logger.log("✅ Auth data stored successfully");
   } catch (error) {
-    console.error("Error storing auth data:", error);
+    logger.error("Error storing auth data:", error);
     throw error;
   }
 };
@@ -146,9 +147,9 @@ export const storeAuthData = async (
 export const clearAuthData = async (): Promise<void> => {
   try {
     await chrome.storage.local.remove(["authToken", "user", "lastAuthTime"]);
-    console.log("✅ Auth data cleared successfully");
+    logger.log("✅ Auth data cleared successfully");
   } catch (error) {
-    console.error("Error clearing auth data:", error);
+    logger.error("Error clearing auth data:", error);
     throw error;
   }
 };
@@ -188,7 +189,7 @@ export const authenticateWithBackend = async (
   user: User;
 }> => {
   try {
-    console.log("🔄 Authenticating with backend...");
+    logger.log("🔄 Authenticating with backend...");
 
     const response = await fetch(API_ENDPOINTS.GOOGLE_SIGNIN, {
       method: "POST",
@@ -206,14 +207,14 @@ export const authenticateWithBackend = async (
     }
 
     const result = await response.json();
-    console.log("✅ Backend authentication successful");
+    logger.log("✅ Backend authentication successful");
 
     return {
       token: result.token || result.accessToken || result.jwt,
       user: result.user,
     };
   } catch (error) {
-    console.error("❌ Backend authentication error:", error);
+    logger.error("❌ Backend authentication error:", error);
     throw error;
   }
 };
@@ -226,7 +227,7 @@ export const fetchUserProfile = async (): Promise<{
   user: UserProfile;
 }> => {
   try {
-    console.log("🔄 Fetching user profile...");
+    logger.log("🔄 Fetching user profile...");
 
     const response = await makeAuthenticatedRequest(
       API_ENDPOINTS.USER_PROFILE,
@@ -243,11 +244,11 @@ export const fetchUserProfile = async (): Promise<{
     }
 
     const result = await response.json();
-    console.log("✅ User profile fetched successfully");
+    logger.log("✅ User profile fetched successfully");
 
     return result;
   } catch (error) {
-    console.error("❌ Error fetching user profile:", error);
+    logger.error("❌ Error fetching user profile:", error);
     throw error;
   }
 };
@@ -264,19 +265,19 @@ export const fetchJobOwnerDetails = async (
     if (jobId) {
       const cachedData = await getCachedJobOwnerDetails(jobId, ownerId);
       if (cachedData) {
-        console.log("✅ Using cached job owner details for job:", jobId);
-        console.log("💰 Saved API call - using local cache");
+        logger.log("✅ Using cached job owner details for job:", jobId);
+        logger.log("💰 Saved API call - using local cache");
         return {
           success: true,
           job_owner: cachedData.job_owner,
           usage: cachedData.usage,
         };
       } else {
-        console.log("🔄 No cache found for job:", jobId, "- making API call");
+        logger.log("🔄 No cache found for job:", jobId, "- making API call");
       }
     }
 
-    console.log("🔄 Fetching job owner details for ownerId:", ownerId);
+    logger.log("🔄 Fetching job owner details for ownerId:", ownerId);
 
     const response = await makeAuthenticatedRequest(
       API_ENDPOINTS.JOB_OWNER_DETAILS,
@@ -326,11 +327,11 @@ export const fetchJobOwnerDetails = async (
     }
 
     const result = await response.json();
-    console.log("✅ Job owner details fetched successfully");
+    logger.log("✅ Job owner details fetched successfully");
 
     // Cache the result if jobId is provided and request was successful
     if (jobId && result.success && result.job_owner && result.usage) {
-      console.log("💾 Caching job owner details for future use");
+      logger.log("💾 Caching job owner details for future use");
       await cacheJobOwnerDetails(
         jobId,
         ownerId,
@@ -341,7 +342,7 @@ export const fetchJobOwnerDetails = async (
 
     return result;
   } catch (error) {
-    console.error("❌ Error fetching job owner details:", error);
+    logger.error("❌ Error fetching job owner details:", error);
     throw error;
   }
 };
@@ -354,7 +355,7 @@ export const isFreelancerProfileSaved = async (): Promise<boolean> => {
     const result = await chrome.storage.local.get(["freelancerProfileSaved"]);
     return result.freelancerProfileSaved === true;
   } catch (error) {
-    console.error("Error checking freelancer profile save status:", error);
+    logger.error("Error checking freelancer profile save status:", error);
     return false;
   }
 };
@@ -368,9 +369,9 @@ export const markFreelancerProfileSaved = async (): Promise<void> => {
       freelancerProfileSaved: true,
       freelancerProfileSavedAt: Date.now(),
     });
-    console.log("✅ Freelancer profile marked as saved");
+    logger.log("✅ Freelancer profile marked as saved");
   } catch (error) {
-    console.error("Error marking freelancer profile as saved:", error);
+    logger.error("Error marking freelancer profile as saved:", error);
     throw error;
   }
 };
@@ -388,7 +389,7 @@ export const saveFreelancerProfile = async (profileData: {
   description?: string;
 }): Promise<{ success: boolean; message?: string }> => {
   try {
-    console.log("🔄 Saving freelancer profile...", profileData);
+    logger.log("🔄 Saving freelancer profile...", profileData);
 
     const response = await makeAuthenticatedRequest(
       API_ENDPOINTS.FREELANCER_PROFILE,
@@ -403,7 +404,7 @@ export const saveFreelancerProfile = async (profileData: {
 
       // Handle 409 - Profile already exists (this is not really an error)
       if (response.status === 409) {
-        console.log("ℹ️ Freelancer profile already exists, marking as saved");
+        logger.log("ℹ️ Freelancer profile already exists, marking as saved");
         await markFreelancerProfileSaved();
         return { success: true, message: "Profile already exists" };
       }
@@ -414,14 +415,14 @@ export const saveFreelancerProfile = async (profileData: {
     }
 
     const result = await response.json();
-    console.log("✅ Freelancer profile saved successfully");
+    logger.log("✅ Freelancer profile saved successfully");
 
     // Mark as saved in storage
     await markFreelancerProfileSaved();
 
     return result;
   } catch (error) {
-    console.error("❌ Error saving freelancer profile:", error);
+    logger.error("❌ Error saving freelancer profile:", error);
     throw error;
   }
 };
@@ -455,7 +456,7 @@ export const shouldClearJobOwnerCache = async (): Promise<boolean> => {
     }
     return false;
   } catch (error) {
-    console.error("Error checking cache clear date:", error);
+    logger.error("Error checking cache clear date:", error);
     return true; // Clear cache on error to be safe
   }
 };
@@ -469,9 +470,9 @@ export const clearJobOwnerCache = async (): Promise<void> => {
     await chrome.storage.local.set({
       lastCacheClearDate: new Date().toDateString(),
     });
-    console.log("✅ Job owner cache cleared for new day");
+    logger.log("✅ Job owner cache cleared for new day");
   } catch (error) {
-    console.error("Error clearing job owner cache:", error);
+    logger.error("Error clearing job owner cache:", error);
     throw error;
   }
 };
@@ -496,8 +497,8 @@ export const getCachedJobOwnerDetails = async (
 
     const cachedData = cache[cacheKey];
     if (cachedData) {
-      console.log("✅ Found cached job owner details for:", cacheKey);
-      console.log(
+      logger.log("✅ Found cached job owner details for:", cacheKey);
+      logger.log(
         "📊 Cache entry age:",
         Math.round((Date.now() - cachedData.cached_at) / 1000),
         "seconds"
@@ -507,7 +508,7 @@ export const getCachedJobOwnerDetails = async (
 
     return null;
   } catch (error) {
-    console.error("Error getting cached job owner details:", error);
+    logger.error("Error getting cached job owner details:", error);
     return null;
   }
 };
@@ -535,9 +536,9 @@ export const cacheJobOwnerDetails = async (
     };
 
     await chrome.storage.local.set({ jobOwnerCache: cache });
-    console.log("✅ Job owner details cached for:", cacheKey);
+    logger.log("✅ Job owner details cached for:", cacheKey);
   } catch (error) {
-    console.error("Error caching job owner details:", error);
+    logger.error("Error caching job owner details:", error);
     // Don't throw error as caching failure shouldn't break the main flow
   }
 };
@@ -565,7 +566,7 @@ export const getJobOwnerCacheStats = async (): Promise<{
       cacheSize,
     };
   } catch (error) {
-    console.error("Error getting cache stats:", error);
+    logger.error("Error getting cache stats:", error);
     return {
       totalEntries: 0,
       lastClearDate: null,
@@ -580,9 +581,9 @@ export const getJobOwnerCacheStats = async (): Promise<{
 export const manualClearJobOwnerCache = async (): Promise<void> => {
   try {
     await chrome.storage.local.remove(["jobOwnerCache", "lastCacheClearDate"]);
-    console.log("✅ Job owner cache manually cleared");
+    logger.log("✅ Job owner cache manually cleared");
   } catch (error) {
-    console.error("Error manually clearing job owner cache:", error);
+    logger.error("Error manually clearing job owner cache:", error);
     throw error;
   }
 };
@@ -597,7 +598,7 @@ export const getAllCachedJobOwnerDetails = async (): Promise<
     const result = await chrome.storage.local.get(["jobOwnerCache"]);
     return result.jobOwnerCache || {};
   } catch (error) {
-    console.error("Error getting all cached job owner details:", error);
+    logger.error("Error getting all cached job owner details:", error);
     return {};
   }
 };
@@ -608,12 +609,10 @@ export const getAllCachedJobOwnerDetails = async (): Promise<
 export const enableExtensionAfterLogin = async (): Promise<void> => {
   try {
     await chrome.storage.sync.set({ enabled: true });
-    console.log("✅ Extension automatically enabled after login");
-    console.log(
-      "🎉 Extension is now active! You can start using all features."
-    );
+    logger.log("✅ Extension automatically enabled after login");
+    logger.log("🎉 Extension is now active! You can start using all features.");
   } catch (error) {
-    console.error("❌ Error enabling extension after login:", error);
+    logger.error("❌ Error enabling extension after login:", error);
     throw error;
   }
 };

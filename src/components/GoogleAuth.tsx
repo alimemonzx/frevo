@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import styled from "styled-components";
 import { API_ENDPOINTS } from "../utils/config";
+import logger from "../utils/logger";
 
 interface GoogleAuthProps {
   onAuthSuccess: (user: {
@@ -180,11 +181,11 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
         const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
         if (authAge < maxAge) {
-          console.log("✅ Found valid existing auth, auto-signing in");
+          logger.log("✅ Found valid existing auth, auto-signing in");
           onAuthSuccess(result.user);
           return;
         } else {
-          console.log("⚠️ Existing auth expired, clearing storage");
+          logger.log("⚠️ Existing auth expired, clearing storage");
           await chrome.storage.local.remove([
             "authToken",
             "user",
@@ -193,7 +194,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
         }
       }
     } catch (error) {
-      console.error("Error checking existing auth:", error);
+      logger.error("Error checking existing auth:", error);
     }
   }, [onAuthSuccess]);
 
@@ -230,7 +231,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
           },
           async (responseUrl) => {
             if (chrome.runtime.lastError) {
-              console.error("Auth error:", chrome.runtime.lastError);
+              logger.error("Auth error:", chrome.runtime.lastError);
               setIsLoading(false);
               onAuthError(
                 chrome.runtime.lastError.message || "Authentication failed"
@@ -258,7 +259,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
               }
 
               if (!idToken) {
-                console.error("❌ No ID token received from Google");
+                logger.error("❌ No ID token received from Google");
                 setIsLoading(false);
                 onAuthError("No ID token received from Google");
                 return;
@@ -270,7 +271,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
               // Call your API with the actual Google ID token
               await callYourAPI(idToken, userInfo);
             } catch (apiError) {
-              console.error("Error processing auth response:", apiError);
+              logger.error("Error processing auth response:", apiError);
               setIsLoading(false);
               onAuthError("Failed to process authentication response");
             }
@@ -278,7 +279,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
         );
       } else {
         // Chrome Identity API is not available
-        console.error("Chrome Identity API not available");
+        logger.error("Chrome Identity API not available");
         setIsLoading(false);
         onAuthError(
           "Chrome Identity API is not available. Please ensure you're running this as a Chrome extension."
@@ -320,7 +321,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
         picture: claims.picture || "",
       };
     } catch (error) {
-      console.error("Error decoding idToken:", error);
+      logger.error("Error decoding idToken:", error);
       throw new Error(
         `Failed to decode idToken: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -334,7 +335,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
     userInfo: { email: string; name: string; picture: string }
   ) => {
     try {
-      console.log("🔄 Sending auth request to backend");
+      logger.log("🔄 Sending auth request to backend");
 
       const response = await fetch(API_ENDPOINTS.GOOGLE_SIGNIN, {
         method: "POST",
@@ -348,14 +349,14 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("❌ Backend auth failed:", response.status, errorText);
+        logger.error("❌ Backend auth failed:", response.status, errorText);
         throw new Error(
           `Backend authentication failed: ${response.status} - ${errorText}`
         );
       }
 
       const apiResult = await response.json();
-      console.log("✅ Authentication successful");
+      logger.log("✅ Authentication successful");
 
       // Store authentication data in Chrome storage for persistence
       if (apiResult.token || apiResult.accessToken || apiResult.jwt) {
@@ -366,7 +367,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
           user: userInfo,
           lastAuthTime: Date.now(),
         });
-        console.log("✅ Auth data stored");
+        logger.log("✅ Auth data stored");
       }
 
       // Store any additional user data from backend
@@ -386,7 +387,7 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
       }
       setIsLoading(false);
     } catch (apiError) {
-      console.error("❌ Error calling backend API:", apiError);
+      logger.error("❌ Error calling backend API:", apiError);
       setIsLoading(false);
       onAuthError(
         apiError instanceof Error
@@ -400,9 +401,9 @@ export const GoogleAuth: React.FC<GoogleAuthProps> = ({
   const logout = React.useCallback(async () => {
     try {
       await chrome.storage.local.remove(["authToken", "user", "lastAuthTime"]);
-      console.log("✅ User logged out, auth data cleared");
+      logger.log("✅ User logged out, auth data cleared");
     } catch (error) {
-      console.error("Error during logout:", error);
+      logger.error("Error during logout:", error);
     }
   }, []);
 

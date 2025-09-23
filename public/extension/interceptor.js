@@ -1,5 +1,20 @@
 (function () {
-  console.log("🔄 Interceptor script loaded");
+  // Load logger utility
+  const logger = (() => {
+    // Simple logger that respects development/production mode
+    // In production builds, this will be silent
+    const isDev = false; // This should be set to true in development builds
+
+    return {
+      log: (...args) => isDev && logger.log(...args),
+      info: (...args) => isDev && console.info(...args),
+      warn: (...args) => isDev && console.warn(...args),
+      error: (...args) => isDev && logger.error(...args),
+      debug: (...args) => isDev && console.debug(...args),
+    };
+  })();
+
+  logger.log("🔄 Interceptor script loaded");
   const originalFetch = window.fetch;
 
   // Intercept fetch requests
@@ -7,17 +22,17 @@
     let url = typeof input === "string" ? input : input.url;
 
     if (url && url.includes("freelancer.com/api/projects/0.1/projects?limit")) {
-      console.log(`🔄 Intercepting fetch: ${url}`);
+      logger.log(`🔄 Intercepting fetch: ${url}`);
 
       return originalFetch(input, init).then((response) => {
         const responseClone = response.clone();
         responseClone
           .json()
           .then((data) => {
-            console.log("📊 Freelancer API Response:", data);
+            logger.log("📊 Freelancer API Response:", data);
           })
           .catch((error) => {
-            console.error("❌ Error reading response:", error);
+            logger.error("❌ Error reading response:", error);
           });
 
         return response;
@@ -30,14 +45,14 @@
       url.includes("freelancer.com/api/users/0.1/self?status=true") &&
       !url.includes("profile_description=true")
     ) {
-      console.log(`🔄 Intercepting self API: ${url}`);
+      logger.log(`🔄 Intercepting self API: ${url}`);
 
       // Add profile_description=true to the URL
       const urlObj = new URL(url);
       urlObj.searchParams.set("profile_description", "true");
       const modifiedUrl = urlObj.toString();
 
-      console.log(`🔄 Modified URL: ${modifiedUrl}`);
+      logger.log(`🔄 Modified URL: ${modifiedUrl}`);
 
       // Make the request with modified URL
       return originalFetch(modifiedUrl, init).then((response) => {
@@ -45,7 +60,7 @@
         responseClone
           .json()
           .then((data) => {
-            console.log("📊 Self API Response with profile_description:", data);
+            logger.log("📊 Self API Response with profile_description:", data);
 
             // Send message to content script (content script will handle storage logic)
             window.postMessage(
@@ -59,7 +74,7 @@
             );
           })
           .catch((error) => {
-            console.error("❌ Error reading self API response:", error);
+            logger.error("❌ Error reading self API response:", error);
           });
 
         return response;
@@ -78,7 +93,7 @@
 
   XMLHttpRequest.prototype.open = function (method, url, ...args) {
     if (url && url.includes("freelancer.com/api/projects/0.1/projects?limit")) {
-      console.log(`🔄 Intercepting XHR: ${url}`);
+      logger.log(`🔄 Intercepting XHR: ${url}`);
       trackedRequests.add(this);
     }
 
@@ -88,13 +103,13 @@
       url.includes("freelancer.com/api/users/0.1/self?status=true") &&
       !url.includes("profile_description=true")
     ) {
-      console.log(`🔄 Intercepting self XHR: ${url}`);
+      logger.log(`🔄 Intercepting self XHR: ${url}`);
 
       const urlObj = new URL(url);
       urlObj.searchParams.set("profile_description", "true");
       const modifiedUrl = urlObj.toString();
 
-      console.log(`🔄 Modified XHR URL: ${modifiedUrl}`);
+      logger.log(`🔄 Modified XHR URL: ${modifiedUrl}`);
       trackedRequests.add(this);
 
       return originalXHROpen.call(this, method, modifiedUrl, ...args);
@@ -119,7 +134,7 @@
                 "freelancer.com/api/users/0.1/self?status=true"
               )
             ) {
-              console.log(
+              logger.log(
                 "📊 Self XHR Response with profile_description:",
                 responseData
               );
@@ -136,7 +151,7 @@
               );
             } else {
               // Handle project data (existing logic)
-              console.log("📊 Freelancer XHR Response:", responseData.result);
+              logger.log("📊 Freelancer XHR Response:", responseData.result);
 
               // Extract all required project data
               const projectData = responseData.result.projects[0];
@@ -150,7 +165,7 @@
                 timestamp: Date.now(),
               };
 
-              console.log("📊 Extracted project data:", extractedData);
+              logger.log("📊 Extracted project data:", extractedData);
 
               window.postMessage(
                 {
@@ -161,7 +176,7 @@
               );
             }
           } catch (error) {
-            console.error("❌ Error parsing XHR response:", error);
+            logger.error("❌ Error parsing XHR response:", error);
           }
         }
 

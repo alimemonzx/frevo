@@ -8,6 +8,7 @@ import { FilterIcon, StarIcon, LoadingSpinner } from "./components/Icons";
 import GoogleAuth from "./components/GoogleAuth";
 import UserProfile from "./components/UserProfile";
 import { enableExtensionAfterLogin, fetchUserProfile } from "./utils/auth";
+import logger from "./utils/logger";
 
 // User type
 interface User {
@@ -291,13 +292,13 @@ function App() {
       const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
 
       if (now - lastFetchTime < fiveMinutes) {
-        console.log("⏭️ Skipping profile fetch - recently updated");
+        logger.log("⏭️ Skipping profile fetch - recently updated");
         return;
       }
 
-      console.log("🔄 Fetching latest profile data...");
+      logger.log("🔄 Fetching latest profile data...");
       const profileData = await fetchUserProfile();
-      console.log("🔍 Latest profile data:", profileData);
+      logger.log("🔍 Latest profile data:", profileData);
 
       const updatedUser = {
         ...user,
@@ -310,16 +311,16 @@ function App() {
       // Update storage with latest data
       if (typeof chrome !== "undefined" && chrome.storage) {
         chrome.storage.sync.set({ user: updatedUser }, () => {
-          console.log("✅ User profile with latest usage data updated");
+          logger.log("✅ User profile with latest usage data updated");
         });
 
         // Store the fetch time to implement caching
         chrome.storage.local.set({ lastProfileFetchTime: now }, () => {
-          console.log("✅ Profile fetch time cached");
+          logger.log("✅ Profile fetch time cached");
         });
       }
     } catch (error) {
-      console.error("❌ Error fetching latest profile data:", error);
+      logger.error("❌ Error fetching latest profile data:", error);
     }
   }, [user]);
 
@@ -331,10 +332,7 @@ function App() {
         chrome.storage.sync.get(["user"], (authData) => {
           if (authData.user) {
             setUser(authData.user);
-            console.log(
-              "✅ User data loaded from sync storage:",
-              authData.user
-            );
+            logger.log("✅ User data loaded from sync storage:", authData.user);
           }
           setIsAuthLoading(false);
 
@@ -390,7 +388,7 @@ function App() {
         [key: string]: chrome.storage.StorageChange;
       }) => {
         if (changes.user && changes.user.newValue) {
-          console.log(
+          logger.log(
             "📨 User data updated in sync storage:",
             changes.user.newValue
           );
@@ -424,7 +422,7 @@ function App() {
                     minStarRating: minStarRating,
                   })
                   .catch((error) => {
-                    console.log("Content script not ready yet:", error.message);
+                    logger.log("Content script not ready yet:", error.message);
                   })
                   .finally(() => {
                     // Reload page after enabling
@@ -434,7 +432,7 @@ function App() {
                     }, 200);
                   });
               } catch (error) {
-                console.log("Error sending message to content script:", error);
+                logger.log("Error sending message to content script:", error);
                 // Reload even if message fails
                 setTimeout(() => {
                   chrome.tabs.reload(tabs[0].id!);
@@ -482,7 +480,7 @@ function App() {
         // Clear sync storage
         await new Promise<void>((resolve) => {
           chrome.storage.sync.clear(() => {
-            console.log("✅ Sync storage cleared");
+            logger.log("✅ Sync storage cleared");
             resolve();
           });
         });
@@ -490,7 +488,7 @@ function App() {
         // Clear local storage
         await new Promise<void>((resolve) => {
           chrome.storage.local.clear(() => {
-            console.log("✅ Local storage cleared");
+            logger.log("✅ Local storage cleared");
             resolve();
           });
         });
@@ -499,7 +497,7 @@ function App() {
         if (currentUserData) {
           await new Promise<void>((resolve) => {
             chrome.storage.sync.set({ user: currentUserData }, () => {
-              console.log("✅ User data restored in sync storage");
+              logger.log("✅ User data restored in sync storage");
               resolve();
             });
           });
@@ -518,7 +516,7 @@ function App() {
                 lastAuthTime: currentAuthData.lastAuthTime,
               },
               () => {
-                console.log("✅ Auth data restored in local storage");
+                logger.log("✅ Auth data restored in local storage");
                 resolve();
               }
             );
@@ -541,7 +539,7 @@ function App() {
                   action: "disable-and-reload",
                 })
                 .catch((error) => {
-                  console.log(
+                  logger.log(
                     "Content script not ready, reloading anyway:",
                     error.message
                   );
@@ -554,7 +552,7 @@ function App() {
                   }, 200);
                 });
             } catch (error) {
-              console.log("Error sending message, reloading anyway:", error);
+              logger.log("Error sending message, reloading anyway:", error);
               // Reload even if message fails
               setTimeout(() => {
                 chrome.tabs.reload(tabs[0].id!);
@@ -565,7 +563,7 @@ function App() {
         });
       }
     } catch (error) {
-      console.error("Error clearing data:", error);
+      logger.error("Error clearing data:", error);
       setIsTransitioning(false);
     }
   };
@@ -585,10 +583,10 @@ function App() {
                     minStarRating: value,
                   })
                   .catch((error) => {
-                    console.log("Content script not ready yet:", error.message);
+                    logger.log("Content script not ready yet:", error.message);
                   });
               } catch (error) {
-                console.log("Error sending message to content script:", error);
+                logger.log("Error sending message to content script:", error);
               }
             }
           });
@@ -599,7 +597,7 @@ function App() {
 
   // Fixed - Proper storage verification and refresh timing
   const handleJobsPerPageChange = async (value: number) => {
-    console.log(`🎯 User wants to set pagination to: ${value}`);
+    logger.log(`🎯 User wants to set pagination to: ${value}`);
 
     if (typeof chrome !== "undefined" && chrome.storage) {
       try {
@@ -610,10 +608,10 @@ function App() {
         await new Promise<void>((resolve, reject) => {
           chrome.storage.local.set({ jobsPerPage: value }, () => {
             if (chrome.runtime.lastError) {
-              console.error("❌ Storage error:", chrome.runtime.lastError);
+              logger.error("❌ Storage error:", chrome.runtime.lastError);
               reject(chrome.runtime.lastError);
             } else {
-              console.log(`✅ Storage write completed: ${value}`);
+              logger.log(`✅ Storage write completed: ${value}`);
               resolve();
             }
           });
@@ -623,13 +621,13 @@ function App() {
         const verification = await new Promise<number>((resolve) => {
           chrome.storage.local.get(["jobsPerPage"], (result) => {
             const storedValue = result.jobsPerPage;
-            console.log(`🔍 Verification read: ${storedValue}`);
+            logger.log(`🔍 Verification read: ${storedValue}`);
             resolve(storedValue);
           });
         });
 
         if (verification === value) {
-          console.log(`✅ Verification successful: ${verification}`);
+          logger.log(`✅ Verification successful: ${verification}`);
 
           // Step 4: Send message to content script to update injected script
           chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -641,14 +639,14 @@ function App() {
                   jobsPerPage: value,
                 },
                 (response) => {
-                  console.log(
+                  logger.log(
                     `📤 Message sent to content script: ${value}`,
                     response
                   );
 
                   // Step 5: Wait a moment for the injected script to receive the update
                   setTimeout(() => {
-                    console.log(
+                    logger.log(
                       `🔄 Refreshing page with new pagination: ${value}`
                     );
                     chrome.tabs.reload(tabs[0].id!);
@@ -659,13 +657,13 @@ function App() {
             }
           });
         } else {
-          console.error(
+          logger.error(
             `❌ Verification failed. Expected: ${value}, Got: ${verification}`
           );
           throw new Error("Storage verification failed");
         }
       } catch (error) {
-        console.error("❌ Error updating pagination:", error);
+        logger.error("❌ Error updating pagination:", error);
         alert("Failed to update pagination. Please try again.");
       }
     }
@@ -673,12 +671,12 @@ function App() {
 
   const resetPagination = async () => {
     const defaultValue = 20;
-    console.log(`🔄 Resetting pagination to default: ${defaultValue}`);
+    logger.log(`🔄 Resetting pagination to default: ${defaultValue}`);
 
     try {
       await handleJobsPerPageChange(defaultValue);
     } catch (error) {
-      console.error("❌ Error resetting pagination:", error);
+      logger.error("❌ Error resetting pagination:", error);
       alert("Failed to reset pagination. Please try again.");
     }
   };
@@ -688,13 +686,13 @@ function App() {
     setUser(userData);
     if (typeof chrome !== "undefined" && chrome.storage) {
       chrome.storage.sync.set({ user: userData }, () => {
-        console.log("✅ User authenticated and saved");
+        logger.log("✅ User authenticated and saved");
       });
 
       // Fetch user profile with usage data
       try {
         const profileData = await fetchUserProfile();
-        console.log("🔍 Profile data:", profileData);
+        logger.log("🔍 Profile data:", profileData);
         const updatedUser = {
           ...userData,
           package_type: profileData.user.package_type,
@@ -702,7 +700,7 @@ function App() {
         };
         setUser(updatedUser);
         chrome.storage.sync.set({ user: updatedUser });
-        console.log("✅ User profile with usage data loaded");
+        logger.log("✅ User profile with usage data loaded");
 
         // Automatically enable the extension after successful login
         await enableExtensionAfterLogin();
@@ -713,12 +711,12 @@ function App() {
           await chrome.tabs.create({
             url: "https://www.freelancer.com/dashboard",
           });
-          console.log("✅ Redirected to freelancer.com/dashboard");
+          logger.log("✅ Redirected to freelancer.com/dashboard");
         } catch (error) {
-          console.error("❌ Failed to redirect to dashboard:", error);
+          logger.error("❌ Failed to redirect to dashboard:", error);
         }
       } catch (error) {
-        console.error("❌ Failed to fetch user profile:", error);
+        logger.error("❌ Failed to fetch user profile:", error);
 
         // Even if profile fetch fails, still enable the extension
         await enableExtensionAfterLogin();
@@ -728,7 +726,7 @@ function App() {
   };
 
   const handleAuthError = (error: string) => {
-    console.error("❌ Authentication error:", error);
+    logger.error("❌ Authentication error:", error);
     // You could show a toast or error message here
   };
 
@@ -745,24 +743,24 @@ function App() {
               chrome.identity.removeCachedAuthToken(
                 { token: token as string },
                 () => {
-                  console.log("✅ Auth token cleared");
+                  logger.log("✅ Auth token cleared");
                 }
               );
             }
           });
         } catch (error) {
-          console.log("Note: Could not clear auth token:", error);
+          logger.log("Note: Could not clear auth token:", error);
         }
       }
 
       if (chrome.storage) {
         chrome.storage.sync.clear(() => {
-          console.log("✅ User logged out, storage cleared");
+          logger.log("✅ User logged out, storage cleared");
         });
 
         // Clear local storage
         chrome.storage.local.clear(() => {
-          console.log("✅ Local storage cleared");
+          logger.log("✅ Local storage cleared");
         });
 
         // Reset extension state

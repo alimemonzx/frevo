@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import styles from "./FrevoAIButton.module.css";
 import { API_ENDPOINTS } from "../../utils/config";
 import { makeAuthenticatedRequest } from "../../utils/auth";
+import logger from "../../utils/logger";
 
 // TypeScript interfaces for proposal generation
 interface ProposalGenerateRequest {
@@ -124,16 +125,16 @@ export const FrevoAIButton: React.FC<FrevoButtonProps> = ({
           textarea.dispatchEvent(new Event("input", { bubbles: true }));
           textarea.dispatchEvent(new Event("change", { bubbles: true }));
           (textarea as HTMLTextAreaElement).focus();
-          console.log("✅ Proposal generated and pasted into textarea");
-          console.log("📊 Usage stats:", data.usage);
+          logger.log("✅ Proposal generated and pasted into textarea");
+          logger.log("📊 Usage stats:", data.usage);
         } else {
-          console.log("❌ Textarea not found");
+          logger.log("❌ Textarea not found");
         }
       } else {
         throw new Error("Failed to generate proposal");
       }
     } catch (error) {
-      console.error("Error calling proposal generation API:", error);
+      logger.error("Error calling proposal generation API:", error);
 
       // Handle authentication errors specifically
       if (
@@ -152,13 +153,13 @@ export const FrevoAIButton: React.FC<FrevoButtonProps> = ({
   };
 
   const handleClick = async () => {
-    console.log("🚀 Frevo button clicked!");
+    logger.log("🚀 Frevo button clicked!");
     setIsLoading(true);
 
     try {
       await generateProposal();
     } catch (error) {
-      console.error("Error in proposal generation:", error);
+      logger.error("Error in proposal generation:", error);
     } finally {
       setIsLoading(false);
     }

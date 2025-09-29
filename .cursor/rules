@@ -1,0 +1,270 @@
+# Frevo Extension - Cursor AI Rules
+
+## Project Overview
+This is a Chrome extension for Freelancer.com that filters projects by star rating and manages pagination. The extension uses React with TypeScript, Vite for building, and styled-components for styling.
+
+## Technology Stack
+- **Language**: TypeScript (strict mode)
+- **Framework**: React 19.1.1 with hooks
+- **Build Tool**: Vite 7.1.2
+- **Package Manager**: npm (use npm commands, not yarn)
+- **Styling**: styled-components + CSS modules
+- **Linting**: ESLint with TypeScript support
+- **Browser APIs**: Chrome Extension APIs
+
+## Key Files & Architecture
+- **Main App**: [src/App.tsx](mdc:src/App.tsx) - Main popup interface with authentication and settings
+- **Content Scripts**: [src/content-script.tsx](mdc:src/content-script.tsx) - Main content script for DOM manipulation
+- **User Profile**: [src/components/UserProfile.tsx](mdc:src/components/UserProfile.tsx) - User profile display with usage limits
+- **Authentication**: [src/utils/auth.ts](mdc:src/utils/auth.ts) - Authentication and API utilities
+- **Configuration**: [src/utils/config.ts](mdc:src/utils/config.ts) - Environment and API configuration
+- **Build Config**: [vite.config.ts](mdc:vite.config.ts) - Complex Vite setup for Chrome extension
+
+## Code Standards & Conventions
+
+### TypeScript
+- Use strict TypeScript with explicit types
+- Always define interfaces for data structures
+- Use proper type annotations for function parameters and return types
+- Prefer `interface` over `type` for object shapes
+- Use `const` assertions where appropriate
+- Avoid `any` type - use `unknown` if necessary
+
+### React Patterns
+- Use functional components with hooks
+- Prefer `useCallback` and `useMemo` for performance optimization
+- Use proper dependency arrays in useEffect
+- Implement proper error boundaries
+- Use React.memo for expensive components when needed
+
+### Chrome Extension Development
+- Always check for `chrome` object availability before use
+- Use proper Chrome storage APIs (sync vs local)
+- Implement proper message passing between content scripts and popup
+- Handle Chrome extension lifecycle properly
+- Use Chrome identity API for authentication
+
+### File Organization
+- Components in `src/components/` with their own folders
+- Utils in `src/utils/`
+- Content scripts in `src/` root
+- Use CSS modules for component-specific styles
+- Keep styled-components in the same file as the component
+
+### Naming Conventions
+- Use PascalCase for components and interfaces
+- Use camelCase for functions, variables, and properties
+- Use kebab-case for file names (except components)
+- Use descriptive names that explain purpose
+
+### Error Handling
+- Always wrap async operations in try-catch
+- Use the logger utility for consistent logging
+- Provide user-friendly error messages
+- Handle Chrome API errors gracefully
+
+### Performance
+- Use React.memo for components that receive stable props
+- Implement proper cleanup in useEffect
+- Use useCallback for event handlers passed to child components
+- Avoid unnecessary re-renders
+
+## Build & Development
+
+### Commands (ALWAYS use npm)
+- `npm run dev` - Development mode
+- `npm run build` - Production build
+- `npm run build:dev` - Development build
+- `npm run lint` - Run ESLint
+- `npm run preview` - Preview production build
+
+### Environment Variables
+- Use VITE_ prefix for environment variables
+- Access via `import.meta.env.VITE_*`
+- Define in vite.config.ts
+
+### Chrome Extension Specifics
+- Manifest v3 compliance
+- Proper content script injection
+- Background script for extension lifecycle
+- Proper permissions in manifest.json
+- Complex Vite build configuration for multiple entry points
+- Content scripts built separately from popup
+- CSS inlining for content scripts
+- Environment-based build flags
+
+## Code Quality Rules
+
+### Imports
+- Use absolute imports when possible
+- Group imports: React, third-party, local
+- Use named imports over default imports when possible
+
+### State Management
+- Use useState for local component state
+- Use Chrome storage for persistent state
+- Implement proper state synchronization between popup and content scripts
+
+### Styling
+- Use styled-components for component styling
+- Follow the existing design system (colors, spacing, typography)
+- Use CSS modules for component-specific styles
+- Maintain consistent spacing using rem units
+
+### Testing Considerations
+- Write testable code with pure functions
+- Separate business logic from UI components
+- Mock Chrome APIs in tests
+- Use proper TypeScript types for test data
+
+## Chrome Extension Architecture
+
+### Content Scripts
+- `content-script.tsx` - Main content script
+- `content-script-2.tsx` - Secondary content script
+- Handle DOM manipulation and user interactions
+- Communicate with popup via Chrome messaging
+
+### Background Script
+- Handle extension lifecycle
+- Manage authentication state
+- Coordinate between different parts of the extension
+
+### Popup
+- Main UI for extension settings
+- User authentication
+- Filter configuration
+- Status display
+
+## Security & Best Practices
+
+### Chrome Extension Security
+- Validate all user inputs
+- Use Content Security Policy
+- Sanitize data before DOM manipulation
+- Implement proper CORS handling
+
+### Data Handling
+- Use Chrome storage APIs properly
+- Implement data validation
+- Handle storage quota limits
+- Clear sensitive data on logout
+
+### Authentication
+- Use Chrome identity API
+- Implement proper token management
+- Handle authentication errors gracefully
+- Clear auth data on logout
+
+## Common Patterns
+
+### Chrome Storage (Promise-based)
+```typescript
+// Always use promises for Chrome storage
+const getData = (): Promise<any> => {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['key'], (result) => {
+      resolve(result.key);
+    });
+  });
+};
+
+// Storage with error handling
+await new Promise<void>((resolve, reject) => {
+  chrome.storage.local.set({ key: value }, () => {
+    if (chrome.runtime.lastError) {
+      reject(chrome.runtime.lastError);
+    } else {
+      resolve();
+    }
+  });
+});
+```
+
+### Message Passing
+```typescript
+// Content script to popup
+chrome.tabs.sendMessage(tabId, { action: 'update', data: value });
+
+// Popup to content script with error handling
+chrome.tabs.sendMessage(tabId, { action: 'enable', data: value })
+  .catch((error) => {
+    console.log("Content script not ready:", error.message);
+  });
+```
+
+### Error Handling with Logger
+```typescript
+try {
+  await someAsyncOperation();
+} catch (error) {
+  logger.error('Operation failed:', error);
+  // Handle error appropriately
+}
+```
+
+### Component Styling Patterns
+```typescript
+// CSS Modules for component-specific styles
+import styles from "./Component.module.css";
+
+// Styled-components for main app
+const StyledComponent = styled.div`
+  // styles here
+`;
+```
+
+### User Data Formatting
+```typescript
+// Format limit values for display
+const formatLimit = (limit: number) => {
+  return limit > 100000 ? "Unlimited" : limit.toString();
+};
+```
+
+## File Structure Rules
+- Keep components small and focused
+- Use proper TypeScript interfaces
+- Implement proper error boundaries
+- Use consistent file naming
+- Group related functionality together
+
+## Debugging
+- Use the logger utility consistently
+- Implement proper error logging
+- Use Chrome DevTools for debugging
+- Test in both development and production modes
+
+## Performance Guidelines
+- Minimize bundle size
+- Use code splitting where appropriate
+- Implement proper caching strategies
+- Optimize Chrome storage usage
+
+## Never Do
+- Don't use yarn commands (always use npm)
+- Don't use `any` type without good reason
+- Don't forget to handle Chrome API errors
+- Don't hardcode sensitive data
+- Don't ignore TypeScript errors
+- Don't use deprecated Chrome APIs
+- Don't forget to clean up event listeners
+- Don't use inline styles (use styled-components or CSS modules)
+- Don't forget to handle async operations properly
+- Don't ignore ESLint warnings
+- Don't forget to format limit values for display (use formatLimit helper)
+
+## Always Do
+- Use TypeScript strict mode
+- Implement proper error handling
+- Use the logger utility for debugging
+- Test Chrome extension functionality
+- Use proper Chrome storage APIs with Promise wrappers
+- Implement proper cleanup
+- Use React hooks properly
+- Follow the existing code patterns
+- Use npm for package management
+- Implement proper authentication flow
+- Use CSS modules for component-specific styles
+- Use styled-components for main app styling
+- Format large numbers as "Unlimited" when > 100K

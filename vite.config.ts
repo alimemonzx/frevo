@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, build as viteBuild } from "vite";
 import react from "@vitejs/plugin-react";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
@@ -54,26 +54,72 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
-    ],
+      // Custom plugin to build content scripts separately
+      isContentBuild && {
+        name: "build-content-scripts",
+        async buildStart() {
+          // Skip the normal build process and build each content script separately
+          const scripts = [
+            { input: "src/content-script.tsx", output: "assets/content.js" },
+            { input: "src/content-script-2.tsx", output: "assets/content2.js" },
+          ];
+
+          for (const script of scripts) {
+            await viteBuild({
+              mode,
+              configFile: false,
+              base: "./",
+              define: {
+                "import.meta.env.VITE_API_BASE_URL": JSON.stringify(
+                  env.VITE_API_BASE_URL
+                ),
+                "import.meta.env.VITE_APP_ENV": JSON.stringify(
+                  env.VITE_APP_ENV || mode
+                ),
+              },
+              plugins: [react()],
+              build: {
+                outDir: "dist",
+                emptyOutDir: false,
+                cssCodeSplit: false,
+                minify: true,
+                assetsInlineLimit: 999999,
+                rollupOptions: {
+                  input: script.input,
+                  output: {
+                    entryFileNames: script.output,
+                    assetFileNames: (assetInfo) => {
+                      if (assetInfo.name?.endsWith(".css")) {
+                        return "assets/[name]";
+                      }
+                      return "assets/[name].[ext]";
+                    },
+                    format: "iife",
+                    inlineDynamicImports: true,
+                  },
+                },
+              },
+              css: {
+                modules: {
+                  generateScopedName: "[name]__[local]___[hash:base64:5]",
+                  localsConvention: "camelCase",
+                },
+              },
+            });
+          }
+
+          // Exit after building all content scripts
+          process.exit(0);
+        },
+      },
+    ].filter(Boolean),
     build: {
       rollupOptions: {
         input: isContentBuild
-          ? {
-              content: "src/content-script.tsx",
-              content2: "src/content-script-2.tsx",
-            }
+          ? "src/content-script.tsx" // Dummy input, won't be used
           : ({ popup: "index.html" } as Record<string, string>),
         output: {
-          entryFileNames: (chunkInfo) => {
-            if (isContentBuild) {
-              const contentScriptMap: Record<string, string> = {
-                content: "assets/content.js",
-                content2: "assets/content2.js",
-              };
-              return contentScriptMap[chunkInfo.name] || "assets/[name].js";
-            }
-            return "assets/[name].js";
-          },
+          entryFileNames: "assets/[name].js",
           chunkFileNames: "assets/[name].js",
           assetFileNames: (assetInfo) => {
             if (assetInfo.name?.endsWith(".css")) {
@@ -89,7 +135,7 @@ export default defineConfig(({ mode }) => {
       cssCodeSplit: false,
       minify: true,
       ...(isContentBuild && {
-        cssInlineLimit: 999999, // Force all CSS to be inlined for content scripts
+        assetsInlineLimit: 999999,
       }),
     },
     css: {

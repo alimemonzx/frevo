@@ -2,14 +2,13 @@
  * Configuration utility for managing environment-based settings
  */
 
-import logger from "./logger";
-
 // Get the base URL from environment variables
 export const getBaseUrl = (): string => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   if (!baseUrl) {
-    logger.warn(
+    // Removed logger to avoid circular dependency during module initialization
+    console.warn(
       "VITE_API_BASE_URL not found in environment variables, falling back to production URL"
     );
     return "https://frevo.app";
@@ -44,8 +43,9 @@ export const API_ENDPOINTS = {
 } as const;
 
 // Log configuration on startup (only in development)
+// Moved to runtime to avoid circular dependency
 if (isDevelopment()) {
-  logger.log("🔧 Configuration loaded:", {
+  console.log("🔧 Configuration loaded:", {
     baseUrl: getBaseUrl(),
     environment: getEnvironment(),
     endpoints: API_ENDPOINTS,

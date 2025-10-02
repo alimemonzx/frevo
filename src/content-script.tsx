@@ -356,24 +356,7 @@ class ExtensionStateManager {
     });
   }
 
-  // 🎯 ALIGN BUTTONS BY MODIFYING THE PARENT CONTAINER
-  private alignButtonsInRow(parentContainer: Element): void {
-    // Style the parent container to be a flex row
-    if (parentContainer instanceof HTMLElement) {
-      parentContainer.style.display = "flex";
-      parentContainer.style.alignItems = "center";
-      parentContainer.style.gap = "8px";
-      parentContainer.style.flexWrap = "wrap";
-    }
-
-    // Also ensure the existing AI button has consistent styling
-    const aiButton = parentContainer.querySelector(
-      "app-bid-description-button"
-    );
-    if (aiButton instanceof HTMLElement) {
-      aiButton.style.flexShrink = "0"; // Prevent shrinking
-    }
-  }
+  // Note: Previous alignButtonsInRow helper removed as the UI is now floating
 
   // 🎨 INJECT CSS MODULES INTO SHADOW DOM
   private async injectCSSModules(shadowRoot: ShadowRoot): Promise<void> {
@@ -406,116 +389,70 @@ class ExtensionStateManager {
     }
   }
 
-  // 🚀 CREATE SHADOW DOM WITH PROPER BUTTON ALIGNMENT
-  private createShadowContainer(parentElement: Element): {
+  // 🚀 CREATE FLOATING SHADOW DOM MOUNT ON BODY (fixed position UI)
+  private createFloatingShadowContainer(): {
     container: HTMLElement;
     shadowRoot: ShadowRoot;
     mountPoint: HTMLElement;
   } {
-    // First, align the parent container
-    this.alignButtonsInRow(parentElement);
-
-    // Create container element
     const container = document.createElement("div");
-    container.setAttribute("data-frevo-button", "true");
-    // 🎯 IMPORTANT: Remove margin-left, let flex gap handle spacing
-    container.style.cssText = "display: inline-block; flex-shrink: 0;";
+    container.setAttribute("data-frevo-floating", "true");
 
-    // 🎯 CREATE SHADOW DOM - COMPLETE ISOLATION!
+    // Create shadow root for style isolation
     const shadowRoot = container.attachShadow({ mode: "open" });
     this.state.shadowRoot = shadowRoot;
 
-    // Create mount point inside shadow DOM
     const mountPoint = document.createElement("div");
     mountPoint.id = "frevo-react-root";
 
-    // 🔥 CSS FOR SHADOW DOM - Including CSS modules and base styles!
     const style = document.createElement("style");
     style.textContent = `
-      /* Reset and base styles for shadow DOM */
-      :host {
-        all: initial;
-        display: inline-block;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      /* Additional alignment and sizing styles */
-      #frevo-react-root {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        display: flex;
-        align-items: center;
-      }
-
-      /* Match the height and style of the native AI button */
-      #frevo-react-root button {
-        height: 40px; /* Match typical button height */
-        min-height: 40px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        white-space: nowrap;
-        vertical-align: middle;
-      }
+      :host { all: initial; }
+      * { box-sizing: border-box; }
+      #frevo-react-root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     `;
 
-    // Inject CSS modules styles into shadow DOM
+    // Inject CSS modules compiled bundle if available
     this.injectCSSModules(shadowRoot);
 
-    // Add styles and mount point to shadow DOM
     shadowRoot.appendChild(style);
     shadowRoot.appendChild(mountPoint);
 
-    // Insert container into parent
-    const aiButton = parentElement.querySelector("app-bid-description-button");
-    if (aiButton?.nextSibling) {
-      parentElement.insertBefore(container, aiButton.nextSibling);
-    } else {
-      parentElement.appendChild(container);
-    }
+    // Append to body for fixed positioning relative to viewport
+    document.body.appendChild(container);
 
     return { container, shadowRoot, mountPoint };
   }
 
-  // 🚀 INJECT BUTTON WITH PROPER ALIGNMENT
+  // 🚀 INJECT FLOATING FREVO BUTTON (fixed)
   private async injectFrevoButton(): Promise<void> {
     if (this.state.frevoButtonInjected) return;
 
-    const aiButton = document.querySelector("app-bid-description-button");
-    if (!aiButton?.parentElement) {
-      logger.log("❌ app-bid-description-button not found");
-      return;
-    }
-
-    logger.log("✅ Injecting Frevo button with proper alignment");
+    logger.log("✅ Injecting floating Frevo button and sidebar");
 
     try {
-      // Create shadow DOM container with alignment
-      const { mountPoint } = this.createShadowContainer(aiButton.parentElement);
+      // Create floating shadow DOM container appended to body
+      const { mountPoint } = this.createFloatingShadowContainer();
 
       // Create React root inside shadow DOM
       const root = createRoot(mountPoint);
       this.state.reactRoot = root;
 
-      // 🎯 RENDER REACT WITH CONSISTENT BUTTON HEIGHT AND STYLING
+      // 🎯 Render React floating button + sidebar
       root.render(
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <FrevoAIButton
-            jobTitle={this.state.jobDetails.title}
-            jobDescription={this.state.jobDetails.description}
-            jobRequirements={this.state.jobDetails.requirements}
-            budget={this.state.jobDetails.budget}
-            timeline={this.state.jobDetails.timeline}
-          />
-        </div>
+        <FrevoAIButton
+          jobTitle={this.state.jobDetails.title}
+          jobDescription={this.state.jobDetails.description}
+          jobRequirements={this.state.jobDetails.requirements}
+          budget={this.state.jobDetails.budget}
+          timeline={this.state.jobDetails.timeline}
+        />
       );
 
       this.state.frevoButtonInjected = true;
-      logger.log("✅ Button rendered with perfect alignment!");
+      logger.log("✅ Floating button rendered!");
     } catch (error) {
-      logger.error("❌ Failed to inject aligned Frevo button:", error);
+      logger.error("❌ Failed to inject floating Frevo button:", error);
       this.cleanupFrevoButton();
     }
   }
@@ -653,21 +590,14 @@ class ExtensionStateManager {
         this.state.reactRoot = null;
       }
 
-      // Remove Shadow DOM container
-      const existingButton = document.querySelector(
-        '[data-frevo-button="true"]'
-      );
-      if (existingButton) {
-        // Also restore parent container styling if needed
-        const parentContainer = existingButton.parentElement;
-        existingButton.remove();
+      // Remove Shadow DOM container(s)
+      const existingOld = document.querySelector('[data-frevo-button="true"]');
+      if (existingOld) existingOld.remove();
 
-        // Reset parent container styling (optional)
-        if (parentContainer instanceof HTMLElement) {
-          // You might want to restore original styling here
-          // For now, we'll leave the flex styling as it generally improves the layout
-        }
-      }
+      const existingFloating = document.querySelector(
+        '[data-frevo-floating="true"]'
+      );
+      if (existingFloating) existingFloating.remove();
 
       // Cleanup observer
       if (this.state.observer) {

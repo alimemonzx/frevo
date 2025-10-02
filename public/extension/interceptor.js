@@ -1,16 +1,22 @@
 (function () {
-  // Load logger utility
+  // Load logger utility (avoid self-recursion)
   const logger = (() => {
     // Simple logger that respects development/production mode
     // In production builds, this will be silent
     const isDev = false; // This should be set to true in development builds
 
+    const wrap =
+      (fn) =>
+      (...args) => {
+        if (isDev) fn(...args);
+      };
+
     return {
-      log: (...args) => isDev && logger.log(...args),
-      info: (...args) => isDev && console.info(...args),
-      warn: (...args) => isDev && console.warn(...args),
-      error: (...args) => isDev && logger.error(...args),
-      debug: (...args) => isDev && console.debug(...args),
+      log: wrap(console.log),
+      info: wrap(console.info),
+      warn: wrap(console.warn),
+      error: wrap(console.error),
+      debug: wrap(console.debug),
     };
   })();
 
